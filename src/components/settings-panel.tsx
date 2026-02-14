@@ -70,8 +70,9 @@ export function SettingsPanel() {
   return (
     <aside
       className={cn(
-        "w-[320px] shrink-0 h-full border-l border-[var(--border)] bg-[var(--sidebar-bg)]",
-        "flex flex-col overflow-hidden animate-fade-in"
+        "shrink-0 h-full border-l border-[var(--border)] bg-[var(--sidebar-bg)]",
+        "flex flex-col overflow-hidden animate-fade-in",
+        "fixed inset-0 z-50 w-full border-l-0 md:relative md:z-auto md:w-[320px] md:border-l"
       )}
     >
       {/* Header */}

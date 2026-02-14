@@ -58,6 +58,8 @@ export function Sidebar() {
 
   const handleGemClick = (gemId: string) => {
     createConversation(gemId);
+    // 移动端自动收起侧边栏
+    if (window.innerWidth < 1024) toggleSidebar();
   };
 
   return (
@@ -102,7 +104,7 @@ export function Sidebar() {
             className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm"
           >
             <Gem size={18} className="text-purple-500" />
-            <span className="font-medium">Gem</span>
+            <span className="font-medium">专家库</span>
             <ChevronRight
               size={14}
               className={cn(
@@ -149,7 +151,7 @@ export function Sidebar() {
                 className="flex items-center gap-2 w-full px-3 py-2 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm text-gemini-blue"
               >
                 <Plus size={16} />
-                <span>新建 Gem</span>
+                <span>找专家</span>
               </button>
             </div>
           )}
@@ -177,7 +179,10 @@ export function Sidebar() {
                         ? "bg-[var(--sidebar-hover)] font-medium"
                         : "hover:bg-[var(--sidebar-hover)]/60"
                     )}
-                    onClick={() => setActiveConversation(conv.id)}
+                    onClick={() => {
+                      setActiveConversation(conv.id);
+                      if (window.innerWidth < 1024) toggleSidebar();
+                    }}
                   >
                     {convGem ? (
                       <span className="shrink-0 text-sm">{convGem.icon}</span>
@@ -223,7 +228,7 @@ export function Sidebar() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-[var(--card)] rounded-2xl w-full max-w-md shadow-xl animate-fade-in">
             <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
-              <h3 className="text-lg font-semibold">新建 Gem</h3>
+              <h3 className="text-lg font-semibold">找专家</h3>
               <button
                 onClick={() => setShowNewGem(false)}
                 className="p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)]"
@@ -246,7 +251,7 @@ export function Sidebar() {
                   value={newGemName}
                   onChange={(e) => setNewGemName(e.target.value)}
                   className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-gemini-blue"
-                  placeholder="Gem 名称"
+                  placeholder="专家名称"
                 />
               </div>
               <input

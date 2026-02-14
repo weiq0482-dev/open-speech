@@ -41,9 +41,11 @@ if not exist ".next\" (
 echo [3/3] 正在启动服务...
 echo.
 echo ----------------------------------------
-echo   访问地址: http://localhost:3001
+echo   本地访问: http://localhost:3001
+echo   局域网:   http://192.168.1.4:3001
+echo   远程访问: 通过 SakuraFrp 隧道（TCP → 3001）
 echo   按 Ctrl+C 停止服务
 echo ----------------------------------------
 echo.
 
-npx next start -p 3001
+npx next start -p 3001 -H 0.0.0.0

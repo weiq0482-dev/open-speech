@@ -346,7 +346,7 @@ export const useChatStore = create<ChatState>()(
     set({ generationConfig: { ...DEFAULT_CONFIG }, customSystemInstruction: "" }),
 }),
     {
-      name: "openspeck-chat-storage",
+      name: "openspeech-chat-storage",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         conversations: state.conversations.map((c) => ({

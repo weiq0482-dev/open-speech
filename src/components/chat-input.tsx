@@ -8,6 +8,7 @@ import {
   Wrench,
   Mic,
   Send,
+  Square,
   X,
   Search,
   Palette,
@@ -41,12 +42,14 @@ const SUGGESTIONS = [
 interface ChatInputProps {
   onSend: (content: string, attachments?: Attachment[]) => void;
   disabled?: boolean;
+  onStop?: () => void;
 }
 
-export function ChatInput({ onSend, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [showTools, setShowTools] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [imageResolution, setImageResolution] = useState<"standard" | "2k" | "4k">("standard");
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,7 +121,13 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
     const trimmed = input.trim();
     if (!trimmed && attachments.length === 0) return;
     if (disabled || isGenerating) return;
-    onSend(trimmed, attachments.length > 0 ? attachments : undefined);
+    // 图片生成时附加分辨率指令
+    let finalContent = trimmed;
+    if (activeTool === "image-gen" && imageResolution !== "standard" && trimmed) {
+      const resMap = { "2k": "2048x2048 (2K high resolution)", "4k": "4096x4096 (4K ultra high resolution)" };
+      finalContent = `${trimmed}\n\n[Output resolution: ${resMap[imageResolution]}, ensure maximum detail and clarity]`;
+    }
+    onSend(finalContent, attachments.length > 0 ? attachments : undefined);
     setInput("");
     setAttachments([]);
     if (textareaRef.current) {
@@ -194,10 +203,10 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto px-4">
+    <div className="w-full max-w-3xl mx-auto px-2 sm:px-4">
       {/* Suggestion chips - only show when conversation is empty */}
       {isEmpty && (
-        <div className="flex flex-wrap gap-2 justify-center mb-4">
+        <div className="flex flex-wrap gap-2 justify-center mb-4 px-1">
           {SUGGESTIONS.map((s) => (
             <button
               key={s}
@@ -205,7 +214,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
                 setInput(s);
                 textareaRef.current?.focus();
               }}
-              className="px-4 py-2 rounded-full border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-sm"
+              className="px-3 sm:px-4 py-2 rounded-full border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-xs sm:text-sm"
             >
               {s}
             </button>
@@ -216,7 +225,7 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
       {/* Attachments preview */}
       {attachments.length > 0 && (
         <div className="flex gap-2 mb-2 flex-wrap">
-          {attachments.map((att) => (
+          {attachments.map((att, idx) => (
             <div
               key={att.id}
               className="relative group rounded-xl border border-[var(--border)] overflow-hidden bg-[var(--card)]"
@@ -235,14 +244,24 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
                   </span>
                 </div>
               )}
+              {/* 编号角标 */}
+              <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                {idx + 1}
+              </div>
               <button
                 onClick={() => removeAttachment(att.id)}
-                className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                className="absolute top-1 right-1 p-0.5 rounded-full bg-black/50 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
               >
                 <X size={12} />
               </button>
             </div>
           ))}
+        </div>
+      )}
+      {/* 多图参考提示 */}
+      {attachments.filter((a) => a.type === "image").length > 1 && (
+        <div className="text-[10px] text-[var(--muted)] mb-1 px-1">
+          💡 可用编号引用图片，如「参考图1的风格 + 图2的构图」
         </div>
       )}
 
@@ -399,6 +418,26 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
                 </button>
               </div>
             )}
+
+            {/* 图片分辨率选择器 */}
+            {activeTool === "image-gen" && (
+              <div className="flex items-center gap-0.5 ml-1">
+                {(["standard", "2k", "4k"] as const).map((res) => (
+                  <button
+                    key={res}
+                    onClick={() => setImageResolution(res)}
+                    className={cn(
+                      "px-2 py-1 rounded-md text-[10px] font-medium transition-colors",
+                      imageResolution === res
+                        ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300"
+                        : "text-[var(--muted)] hover:bg-[var(--sidebar-hover)]"
+                    )}
+                  >
+                    {res === "standard" ? "标准" : res.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-1">
@@ -410,27 +449,37 @@ export function ChatInput({ onSend, disabled }: ChatInputProps) {
               <Mic size={20} />
             </button>
 
-            {/* Send */}
-            <button
-              onClick={handleSubmit}
-              disabled={(!input.trim() && attachments.length === 0) || isGenerating}
-              className={cn(
-                "p-2 rounded-full transition-colors",
-                input.trim() || attachments.length > 0
-                  ? "bg-gemini-blue text-white hover:bg-blue-600"
-                  : "text-[var(--muted)] cursor-not-allowed"
-              )}
-              title="发送"
-            >
-              <Send size={18} />
-            </button>
+            {/* Send / Stop */}
+            {isGenerating ? (
+              <button
+                onClick={onStop}
+                className="p-2 rounded-full bg-red-500 text-white hover:bg-red-600 transition-colors animate-pulse"
+                title="停止生成"
+              >
+                <Square size={18} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                onClick={handleSubmit}
+                disabled={!input.trim() && attachments.length === 0}
+                className={cn(
+                  "p-2 rounded-full transition-colors",
+                  input.trim() || attachments.length > 0
+                    ? "bg-gemini-blue text-white hover:bg-blue-600"
+                    : "text-[var(--muted)] cursor-not-allowed"
+                )}
+                title="发送"
+              >
+                <Send size={18} />
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Disclaimer */}
       <div className="text-center mt-2 text-[10px] text-[var(--muted)]">
-        OpenSpeck 可能会出错，请核实重要信息。
+        OpenSpeech 可能会出错，请核实重要信息。
       </div>
     </div>
   );

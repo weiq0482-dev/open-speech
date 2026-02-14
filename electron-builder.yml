@@ -1,0 +1,32 @@
+appId: com.openspeech.app
+productName: OpenSpeech
+copyright: Copyright © 2026 OpenSpeech
+
+directories:
+  output: dist-electron
+
+files:
+  - "electron/**/*"
+  - ".next/standalone/**/*"
+  - ".next/static/**/*"
+  - "public/**/*"
+  - "package.json"
+  - ".env.local"
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  sign: false
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: "OpenSpeech-${version}-Setup.${ext}"
+  shortcutName: OpenSpeech
+  uninstallDisplayName: OpenSpeech
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+asar: false

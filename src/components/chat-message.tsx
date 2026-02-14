@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState, useCallback } from "react";
+import { ImageEditor } from "./image-editor";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
@@ -21,12 +22,15 @@ import {
   ChevronRight,
   ExternalLink,
   Download,
+  Pencil,
 } from "lucide-react";
 
 interface ChatMessageProps {
   message: Message;
   isLast?: boolean;
   onRegenerate?: () => void;
+  onRegenerateImage?: (messageId: string) => void;
+  onEditImage?: (annotatedImageDataUrl: string, instruction: string) => void;
 }
 
 function TypingIndicator() {
@@ -119,25 +123,58 @@ function GroundingSources({ sources }: { sources: { title: string; url: string }
   );
 }
 
-function GeneratedImages({ images }: { images: string[] }) {
+function GeneratedImages({
+  images,
+  onEditImage,
+}: {
+  images: string[];
+  onEditImage?: (annotatedImageDataUrl: string, instruction: string) => void;
+}) {
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
+
   if (!images || images.length === 0) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-3">
-      {images.map((img, i) => (
-        <div key={i} className="relative group rounded-xl overflow-hidden border border-[var(--border)] shadow-sm">
-          <img src={img} alt={`生成图片 ${i + 1}`} className="max-h-80 max-w-full object-contain" />
-          <a
-            href={img}
-            download={`openspeck-image-${i + 1}.png`}
-            className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black/70"
-            title="下载图片"
-          >
-            <Download size={14} />
-          </a>
-        </div>
-      ))}
-    </div>
+    <>
+      <div className="mt-3 flex flex-wrap gap-3">
+        {images.map((img, i) => (
+          <div key={i} className="relative group rounded-xl overflow-hidden border border-[var(--border)] shadow-sm">
+            <img src={img} alt={`生成图片 ${i + 1}`} className="max-h-60 sm:max-h-80 max-w-full object-contain" />
+            <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              {onEditImage && (
+                <button
+                  onClick={() => setEditingIdx(i)}
+                  className="p-1.5 rounded-lg bg-black/50 text-white hover:bg-black/70"
+                  title="标记编辑"
+                >
+                  <Pencil size={14} />
+                </button>
+              )}
+              <a
+                href={img}
+                download={`openspeech-image-${i + 1}.png`}
+                className="p-1.5 rounded-lg bg-black/50 text-white hover:bg-black/70"
+                title="下载图片"
+              >
+                <Download size={14} />
+              </a>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* 图片编辑器弹窗 */}
+      {editingIdx !== null && onEditImage && (
+        <ImageEditor
+          imageSrc={images[editingIdx]}
+          onSubmit={(annotatedUrl, instruction) => {
+            setEditingIdx(null);
+            onEditImage(annotatedUrl, instruction);
+          }}
+          onClose={() => setEditingIdx(null)}
+        />
+      )}
+    </>
   );
 }
 
@@ -185,6 +222,8 @@ export const ChatMessage = memo(function ChatMessage({
   message,
   isLast,
   onRegenerate,
+  onRegenerateImage,
+  onEditImage,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const [liked, setLiked] = useState<"up" | "down" | null>(null);
@@ -192,27 +231,34 @@ export const ChatMessage = memo(function ChatMessage({
   return (
     <div
       className={cn(
-        "flex gap-3 py-4 animate-fade-in",
+        "flex gap-2 sm:gap-3 py-3 sm:py-4 animate-fade-in",
         isUser ? "justify-end" : "justify-start"
       )}
     >
       {!isUser && (
-        <div className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-          <Sparkles size={16} className="text-white" />
+        <div className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
+          <Sparkles size={14} className="text-white sm:hidden" />
+          <Sparkles size={16} className="text-white hidden sm:block" />
         </div>
       )}
 
-      <div className={cn("max-w-[85%] min-w-0", isUser && "order-first")}>
+      <div className={cn("max-w-[92%] sm:max-w-[85%] min-w-0", isUser && "order-first")}>
         {/* Attachments */}
         {message.attachments && message.attachments.length > 0 && (
           <div className="flex gap-2 mb-2 flex-wrap">
-            {message.attachments.map((att) => (
-              <div key={att.id} className="rounded-xl overflow-hidden border border-[var(--border)]">
+            {message.attachments.map((att, idx) => (
+              <div key={att.id} className="relative rounded-xl overflow-hidden border border-[var(--border)]">
                 {att.type === "image" ? (
-                  <img src={att.url} alt={att.name} className="max-h-48 max-w-xs object-contain" />
+                  <img src={att.url} alt={att.name} className="max-h-32 sm:max-h-48 max-w-[200px] sm:max-w-xs object-contain" />
                 ) : (
                   <div className="px-3 py-2 text-sm text-[var(--muted)]">
                     {att.mimeType.startsWith("audio/") ? "🎵" : att.mimeType.startsWith("video/") ? "🎬" : "📎"} {att.name}
+                  </div>
+                )}
+                {/* 编号角标 */}
+                {message.attachments!.length > 1 && (
+                  <div className="absolute top-1 left-1 w-5 h-5 rounded-full bg-blue-500 text-white text-[10px] font-bold flex items-center justify-center shadow">
+                    {idx + 1}
                   </div>
                 )}
               </div>
@@ -242,30 +288,34 @@ export const ChatMessage = memo(function ChatMessage({
         </div>
 
         {/* Generated images */}
-        {!isUser && <GeneratedImages images={message.generatedImages || []} />}
+        {!isUser && <GeneratedImages images={message.generatedImages || []} onEditImage={onEditImage} />}
+
+        {/* 重新生图按钮 */}
+        {!isUser && !message.isStreaming && message.generatedImages && message.generatedImages.length > 0 && onRegenerateImage && (
+          <button
+            onClick={() => onRegenerateImage(message.id)}
+            className="inline-flex items-center gap-1.5 mt-2 px-3 py-1.5 rounded-lg text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+          >
+            <RotateCcw size={12} />
+            重新生图
+          </button>
+        )}
 
         {/* Grounding sources (Deep Research) */}
         {!isUser && <GroundingSources sources={message.groundingSources || []} />}
 
-        {/* Tool badge + Token count */}
-        <div className="flex items-center gap-2 flex-wrap mt-1">
-          {message.toolUsed && TOOL_LABELS[message.toolUsed] && (
+        {/* Tool badge */}
+        {message.toolUsed && TOOL_LABELS[message.toolUsed] && (
+          <div className="mt-1">
             <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-300 text-xs">
               {TOOL_LABELS[message.toolUsed]}
             </div>
-          )}
-          {!isUser && !message.isStreaming && message.tokenCount && (
-            <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-800 text-[var(--muted)] text-[10px] font-mono">
-              <span>↑{message.tokenCount.input}</span>
-              <span>↓{message.tokenCount.output}</span>
-              <span>tokens</span>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Action buttons */}
         {!isUser && !message.isStreaming && (message.content || (message.generatedImages && message.generatedImages.length > 0)) && (
-          <div className="flex items-center gap-1 mt-2 opacity-0 group-hover:opacity-100 hover:opacity-100 transition-opacity">
+          <div className="flex items-center gap-1 mt-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:hover:opacity-100 transition-opacity">
             <button
               onClick={() => setLiked(liked === "up" ? null : "up")}
               className={cn(
@@ -317,8 +367,9 @@ export const ChatMessage = memo(function ChatMessage({
       </div>
 
       {isUser && (
-        <div className="shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
-          <User size={16} className="text-white" />
+        <div className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-green-400 to-blue-500 flex items-center justify-center">
+          <User size={14} className="text-white sm:hidden" />
+          <User size={16} className="text-white hidden sm:block" />
         </div>
       )}
     </div>
