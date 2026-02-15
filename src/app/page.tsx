@@ -1,12 +1,11 @@
 "use client";
 
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useState } from "react";
 import { useChatStore, type Attachment } from "@/store/chat-store";
 import { Sidebar } from "@/components/sidebar";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessage } from "@/components/chat-message";
-import { SettingsPanel } from "@/components/settings-panel";
-import { Menu, SquarePen, Sparkles, Sliders } from "lucide-react";
+import { Menu, SquarePen, Sparkles } from "lucide-react";
 
 export default function Home() {
   const {
@@ -23,13 +22,13 @@ export default function Home() {
     isGenerating,
     setIsGenerating,
     activeGemId,
-    settingsPanelOpen,
-    toggleSettingsPanel,
+    userApiKey,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeConv = getActiveConversation();
+  const [showPromo, setShowPromo] = useState(false);
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -102,17 +101,16 @@ export default function Home() {
             gemSystemPrompt: gem?.systemPrompt,
             generationConfig,
             customSystemInstruction: customSystemInstruction || undefined,
+            userApiKey: userApiKey || undefined,
           }),
           signal: abortController.signal,
         });
 
         if (!response.ok) {
-          const err = await response.json();
-          updateMessage(convId!, assistantMsgId, {
-            content: `❌ 请求失败: ${err.error || response.statusText}\n\n${err.details || ""}`,
-          });
+          updateMessage(convId!, assistantMsgId, { content: "" });
           setMessageStreaming(convId!, assistantMsgId, false);
           setIsGenerating(false);
+          setShowPromo(true);
           return;
         }
 
@@ -120,9 +118,8 @@ export default function Home() {
         if (activeTool === "image-gen") {
           const data = await response.json();
           if (data.error) {
-            updateMessage(convId!, assistantMsgId, {
-              content: `❌ ${data.error}\n\n${data.details || ""}`,
-            });
+            updateMessage(convId!, assistantMsgId, { content: "" });
+            setShowPromo(true);
           } else {
             updateMessage(convId!, assistantMsgId, {
               content: data.text || "图片已生成：",
@@ -197,8 +194,8 @@ export default function Home() {
                   });
                 }
                 if (json.error) {
-                  fullContent += `\n\n❌ ${json.error}`;
-                  updateMessage(convId!, assistantMsgId, { content: fullContent });
+                  updateMessage(convId!, assistantMsgId, { content: "" });
+                  setShowPromo(true);
                 }
               } catch (e) {
                 console.warn("[SSE parse error]", data?.slice(0, 100), e);
@@ -209,16 +206,15 @@ export default function Home() {
 
         if (!fullContent && !fullThinking && collectedImages.length === 0) {
           updateMessage(convId!, assistantMsgId, {
-            content: "⚠️ 未收到回复，请检查 API 配置。",
+            content: "",
           });
         }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           // 用户主动停止，保留已生成的内容
         } else {
-          updateMessage(convId!, assistantMsgId, {
-            content: `❌ 网络错误: ${error instanceof Error ? error.message : String(error)}`,
-          });
+          updateMessage(convId!, assistantMsgId, { content: "" });
+          setShowPromo(true);
         }
       } finally {
         abortControllerRef.current = null;
@@ -296,20 +292,17 @@ export default function Home() {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMessages, tool: "image-gen" }),
+          body: JSON.stringify({ messages: apiMessages, tool: "image-gen", userApiKey: userApiKey || undefined }),
         });
 
         if (!response.ok) {
-          const err = await response.json();
-          updateMessage(convId, newAssistantMsgId, {
-            content: `\u274C \u8BF7\u6C42\u5931\u8D25: ${err.error || response.statusText}`,
-          });
+          updateMessage(convId, newAssistantMsgId, { content: "" });
+          setShowPromo(true);
         } else {
           const data = await response.json();
           if (data.error) {
-            updateMessage(convId, newAssistantMsgId, {
-              content: `\u274C ${data.error}`,
-            });
+            updateMessage(convId, newAssistantMsgId, { content: "" });
+            setShowPromo(true);
           } else {
             updateMessage(convId, newAssistantMsgId, {
               content: data.text || "\u56FE\u7247\u5DF2\u91CD\u65B0\u751F\u6210\uFF1A",
@@ -318,9 +311,8 @@ export default function Home() {
           }
         }
       } catch (error) {
-        updateMessage(convId, newAssistantMsgId, {
-          content: `\u274C \u7F51\u7EDC\u9519\u8BEF: ${error instanceof Error ? error.message : String(error)}`,
-        });
+        updateMessage(convId, newAssistantMsgId, { content: "" });
+        setShowPromo(true);
       } finally {
         setMessageStreaming(convId, newAssistantMsgId, false);
         setIsGenerating(false);
@@ -370,20 +362,17 @@ export default function Home() {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMessages, tool: "image-gen" }),
+          body: JSON.stringify({ messages: apiMessages, tool: "image-gen", userApiKey: userApiKey || undefined }),
         });
 
         if (!response.ok) {
-          const err = await response.json();
-          updateMessage(convId, assistantMsgId, {
-            content: `❌ 请求失败: ${err.error || response.statusText}`,
-          });
+          updateMessage(convId, assistantMsgId, { content: "" });
+          setShowPromo(true);
         } else {
           const data = await response.json();
           if (data.error) {
-            updateMessage(convId, assistantMsgId, {
-              content: `❌ ${data.error}`,
-            });
+            updateMessage(convId, assistantMsgId, { content: "" });
+            setShowPromo(true);
           } else {
             updateMessage(convId, assistantMsgId, {
               content: data.text || "图片已编辑：",
@@ -392,9 +381,8 @@ export default function Home() {
           }
         }
       } catch (error) {
-        updateMessage(convId, assistantMsgId, {
-          content: `❌ 网络错误: ${error instanceof Error ? error.message : String(error)}`,
-        });
+        updateMessage(convId, assistantMsgId, { content: "" });
+        setShowPromo(true);
       } finally {
         setMessageStreaming(convId, assistantMsgId, false);
         setIsGenerating(false);
@@ -432,20 +420,6 @@ export default function Home() {
             <Sparkles size={20} className="text-gemini-blue" />
             <span className="font-semibold text-lg">OpenSpeech</span>
           </div>
-          <div className="ml-auto">
-            <button
-              onClick={toggleSettingsPanel}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors text-sm ${
-                settingsPanelOpen
-                  ? "bg-blue-100 text-gemini-blue dark:bg-blue-900/30"
-                  : "hover:bg-[var(--sidebar-hover)] text-[var(--muted)]"
-              }`}
-              title="运行设置 (AI Studio)"
-            >
-              <Sliders size={16} />
-              <span className="hidden sm:inline">设置</span>
-            </button>
-          </div>
         </header>
 
         {/* Chat area */}
@@ -481,7 +455,7 @@ export default function Home() {
           ) : (
             /* Messages */
             <div className="max-w-3xl mx-auto px-2 sm:px-4 py-2 sm:py-4">
-              {activeConv.messages.map((msg, i) => (
+              {activeConv.messages.filter((m) => m.role === "user" || m.content || m.isStreaming || (m.generatedImages && m.generatedImages.length > 0)).map((msg, i, arr) => (
                 <div key={msg.id} className="group">
                   <ChatMessage
                     message={msg}
@@ -503,8 +477,32 @@ export default function Home() {
         </div>
       </main>
 
-      {/* AI Studio Settings Panel */}
-      <SettingsPanel />
+      {/* 推广弹窗 */}
+      {showPromo && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowPromo(false)}>
+          <div
+            className="bg-[var(--card)] rounded-2xl p-6 max-w-sm w-full text-center shadow-xl animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-sm text-red-500 dark:text-red-400 mb-4">API 额度已用尽</p>
+            <img
+              src="/douyin-qr.png"
+              alt="抖音二维码"
+              className="w-64 h-auto mx-auto rounded-xl mb-4"
+            />
+            <p className="text-base font-semibold mb-1">抖音号：arch8288</p>
+            <p className="text-sm text-[var(--muted)] mb-4">
+              后台私信获取 · 小黄车购买
+            </p>
+            <button
+              onClick={() => setShowPromo(false)}
+              className="w-full px-4 py-2 rounded-xl bg-gemini-blue text-white text-sm hover:opacity-90 transition-opacity"
+            >
+              我知道了
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

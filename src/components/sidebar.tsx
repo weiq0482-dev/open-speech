@@ -1,20 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { useChatStore } from "@/store/chat-store";
+import { useChatStore, MODE_CONFIGS, GenerationMode } from "@/store/chat-store";
 import { cn } from "@/lib/utils";
 import {
   Menu,
   SquarePen,
   MessageSquare,
   Trash2,
-  Settings,
   Moon,
   Sun,
   ChevronRight,
   Plus,
   X,
   Gem,
+  Key,
+  Headphones,
 } from "lucide-react";
 
 export function Sidebar() {
@@ -32,9 +33,16 @@ export function Sidebar() {
     addGem,
     deleteGem,
     activeGemId,
+    activeMode,
+    setActiveMode,
+    userApiKey,
+    setUserApiKey,
   } = useChatStore();
 
   const [showGems, setShowGems] = useState(false);
+  const [showApiKeyInput, setShowApiKeyInput] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [showContact, setShowContact] = useState(false);
   const [showNewGem, setShowNewGem] = useState(false);
   const [newGemName, setNewGemName] = useState("");
   const [newGemIcon, setNewGemIcon] = useState("🤖");
@@ -209,6 +217,32 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="p-3 border-t border-[var(--border)] space-y-1">
+          {/* Mode selector */}
+          <div className="px-1 pb-1">
+            <div className="text-[10px] font-medium text-[var(--muted)] px-2 mb-1">AI 模式</div>
+            <div className="grid grid-cols-1 gap-0.5">
+              {(Object.keys(MODE_CONFIGS) as GenerationMode[]).map((mode) => {
+                const m = MODE_CONFIGS[mode];
+                const isActive = activeMode === mode;
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => setActiveMode(mode)}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors",
+                      isActive
+                        ? "bg-gemini-blue/10 text-gemini-blue font-medium"
+                        : "text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
+                    )}
+                  >
+                    <span className="text-sm">{m.icon}</span>
+                    <span>{m.label}</span>
+                    <span className="ml-auto text-[10px] text-[var(--muted)]">{m.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
           <button
             onClick={toggleDarkMode}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm"
@@ -216,9 +250,48 @@ export function Sidebar() {
             {darkMode ? <Sun size={18} /> : <Moon size={18} />}
             <span>{darkMode ? "浅色模式" : "深色模式"}</span>
           </button>
-          <button className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm">
-            <Settings size={18} />
-            <span>设置</span>
+
+          {/* API Key */}
+          <button
+            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+            className={cn(
+              "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm",
+              userApiKey ? "text-green-600 dark:text-green-400" : "text-[var(--foreground)]"
+            )}
+          >
+            <Key size={18} />
+            <span>API Key</span>
+            {userApiKey && (
+              <span className="ml-auto text-[10px] text-green-600 dark:text-green-400">已配置</span>
+            )}
+          </button>
+          {showApiKeyInput && (
+            <div className="px-2 pb-1 animate-fade-in">
+              <div className="relative">
+                <input
+                  type={showApiKey ? "text" : "password"}
+                  value={userApiKey}
+                  onChange={(e) => setUserApiKey(e.target.value)}
+                  placeholder="输入你的 API Key"
+                  className="w-full px-3 py-2 pr-12 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-gemini-blue"
+                />
+                <button
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)] hover:text-[var(--foreground)] px-1.5 py-0.5 rounded hover:bg-[var(--sidebar-hover)]"
+                >
+                  {showApiKey ? "隐藏" : "显示"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 联系客服 */}
+          <button
+            onClick={() => setShowContact(true)}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm"
+          >
+            <Headphones size={18} />
+            <span>联系客服</span>
           </button>
         </div>
       </aside>
@@ -289,6 +362,32 @@ export function Sidebar() {
                 创建
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 联系客服弹窗 */}
+      {showContact && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowContact(false)}>
+          <div
+            className="bg-[var(--card)] rounded-2xl p-6 max-w-sm w-full text-center shadow-xl animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-base font-semibold mb-4">微信扫码联系客服</p>
+            <img
+              src="/wechat-qr.png"
+              alt="微信二维码"
+              className="w-64 h-auto mx-auto rounded-xl mb-4"
+            />
+            <p className="text-sm text-[var(--muted)] mb-4">
+              扫码添加微信 · 咨询充值与使用问题
+            </p>
+            <button
+              onClick={() => setShowContact(false)}
+              className="w-full px-4 py-2 rounded-xl bg-gemini-blue text-white text-sm hover:opacity-90 transition-opacity"
+            >
+              我知道了
+            </button>
           </div>
         </div>
       )}

@@ -403,14 +403,17 @@ export async function POST(req: NextRequest) {
       gemSystemPrompt,
       generationConfig: userGenConfig,
       customSystemInstruction,
+      userApiKey,
     } = body;
 
-    const apiKey = process.env.GEMINI_API_KEY || "";
+    // 优先使用用户传入的 Key，其次使用环境变量
+    const apiKey = userApiKey || process.env.GEMINI_API_KEY || "";
+    // API 地址仅从服务端配置读取，不接受前端传入
     const apiBase = process.env.GEMINI_API_BASE || "https://4sapi.com";
 
     if (!apiKey || apiKey === "your-api-key-here") {
       return new Response(
-        JSON.stringify({ error: "请先配置 API Key", details: "在 .env.local 中设置 GEMINI_API_KEY" }),
+        JSON.stringify({ error: "请先配置 API Key", details: "请在「设置」中填入你的 API Key" }),
         { status: 401, headers: { "Content-Type": "application/json" } }
       );
     }

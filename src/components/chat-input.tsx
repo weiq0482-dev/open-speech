@@ -301,7 +301,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
           <div className="flex items-center gap-1 px-3 pt-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[var(--muted)]">
               <Sparkles size={14} className="text-gemini-blue" />
-              <span>Gemini 3 Pro</span>
+              <span>OpenSpeech</span>
               {activeTool !== "none" && (
                 <span className="text-xs text-blue-500 ml-1">
                   · {TOOLS.find((t) => t.id === activeTool)?.label}
@@ -479,7 +479,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
 
       {/* Disclaimer */}
       <div className="text-center mt-2 text-[10px] text-[var(--muted)]">
-        OpenSpeech 可能会出错，请核实重要信息。
+        Gemini 大模型尝鲜体验、仅供交流学习
       </div>
     </div>
   );

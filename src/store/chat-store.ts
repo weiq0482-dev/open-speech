@@ -42,6 +42,16 @@ const DEFAULT_CONFIG: GenerationConfig = {
   thinkingBudget: 4096,
 };
 
+export type GenerationMode = "balanced" | "precise" | "creative" | "code" | "deep";
+
+export const MODE_CONFIGS: Record<GenerationMode, { label: string; icon: string; desc: string; config: GenerationConfig }> = {
+  balanced: { label: "均衡模式", icon: "⚖️", desc: "默认设置", config: { ...DEFAULT_CONFIG } },
+  precise:  { label: "精确模式", icon: "🎯", desc: "低随机", config: { temperature: 0.2, topP: 0.8, topK: 20, maxOutputTokens: 8192, thinkingBudget: 4096 } },
+  creative: { label: "创意模式", icon: "🎨", desc: "高随机", config: { temperature: 1.2, topP: 0.95, topK: 60, maxOutputTokens: 8192, thinkingBudget: 4096 } },
+  code:     { label: "代码模式", icon: "💻", desc: "长输出", config: { temperature: 0.3, topP: 0.85, topK: 30, maxOutputTokens: 16384, thinkingBudget: 4096 } },
+  deep:     { label: "深度模式", icon: "🧠", desc: "最大思考", config: { temperature: 0.8, topP: 0.95, topK: 40, maxOutputTokens: 65536, thinkingBudget: 32768 } },
+};
+
 export interface Gem {
   id: string;
   name: string;
@@ -161,8 +171,14 @@ interface ChatState {
   activeGemId: string | null;
   // AI Studio 设置
   generationConfig: GenerationConfig;
+  activeMode: GenerationMode;
   customSystemInstruction: string;
   settingsPanelOpen: boolean;
+  // 用户 API 配置
+  userApiKey: string;
+  userApiBase: string;
+  // 用户标识（自动生成，用于消息推送和客服通信）
+  userId: string;
 
   // Actions
   createConversation: (gemId?: string) => string;
@@ -183,9 +199,14 @@ interface ChatState {
   getGemById: (id: string) => Gem | undefined;
   // AI Studio actions
   setGenerationConfig: (config: Partial<GenerationConfig>) => void;
+  setActiveMode: (mode: GenerationMode) => void;
   setCustomSystemInstruction: (instruction: string) => void;
   toggleSettingsPanel: () => void;
   resetGenerationConfig: () => void;
+  // API 配置 actions
+  setUserApiKey: (key: string) => void;
+  setUserApiBase: (base: string) => void;
+  clearAllConversations: () => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -200,8 +221,12 @@ export const useChatStore = create<ChatState>()(
   gems: [...BUILTIN_GEMS],
   activeGemId: null,
   generationConfig: { ...DEFAULT_CONFIG },
+  activeMode: "balanced" as GenerationMode,
   customSystemInstruction: "",
   settingsPanelOpen: false,
+  userApiKey: "",
+  userApiBase: "",
+  userId: typeof crypto !== "undefined" ? crypto.randomUUID() : generateId(),
 
   createConversation: (gemId?: string) => {
     const id = generateId();
@@ -338,12 +363,18 @@ export const useChatStore = create<ChatState>()(
     set((state) => ({
       generationConfig: { ...state.generationConfig, ...config },
     })),
+  setActiveMode: (mode) =>
+    set({ activeMode: mode, generationConfig: { ...MODE_CONFIGS[mode].config } }),
   setCustomSystemInstruction: (instruction) =>
     set({ customSystemInstruction: instruction }),
   toggleSettingsPanel: () =>
     set((state) => ({ settingsPanelOpen: !state.settingsPanelOpen })),
   resetGenerationConfig: () =>
     set({ generationConfig: { ...DEFAULT_CONFIG }, customSystemInstruction: "" }),
+  setUserApiKey: (key) => set({ userApiKey: key }),
+  setUserApiBase: (base) => set({ userApiBase: base }),
+  clearAllConversations: () =>
+    set({ conversations: [], activeConversationId: null }),
 }),
     {
       name: "openspeech-chat-storage",
@@ -367,7 +398,11 @@ export const useChatStore = create<ChatState>()(
         gems: state.gems.filter((g) => !g.isBuiltin),
         activeGemId: state.activeGemId,
         generationConfig: state.generationConfig,
+        activeMode: state.activeMode,
         customSystemInstruction: state.customSystemInstruction,
+        userApiKey: state.userApiKey,
+        userApiBase: state.userApiBase,
+        userId: state.userId,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
