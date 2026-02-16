@@ -67,8 +67,8 @@ export async function POST(req: NextRequest) {
     const webhookUrl = process.env.CONTACT_WEBHOOK_URL;
     if (webhookUrl) {
       const timestamp = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || req.headers.get("origin") || "http://localhost:3000";
-      const replyUrl = `${appUrl}/reply?u=${encodeURIComponent(userId)}&k=${encodeURIComponent(ADMIN_KEY)}`;
+      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || req.headers.get("origin") || "http://localhost:3000").trim();
+      const replyUrl = `${appUrl}/reply?u=${encodeURIComponent(userId)}&k=${encodeURIComponent(ADMIN_KEY.trim())}`;
       const text = `📩 用户反馈\n用户ID: ${userId.slice(0, 8)}...\n时间: ${timestamp}\n内容: ${message}\n\n� 点击回复: ${replyUrl}`;
 
       const webhookBody = { msgtype: "text", text: { content: text } };
