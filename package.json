@@ -12,6 +12,7 @@
     "electron:build": "next build && electron-builder --win"
   },
   "dependencies": {
+    "@upstash/redis": "^1.36.2",
     "clsx": "^2.1.0",
     "lucide-react": "^0.344.0",
     "next": "^14.2.0",

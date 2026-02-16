@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addMessage, getMessages, getAllThreads, markAdminRead } from "@/lib/message-store";
+import { addMessage, getMessagesAsync, getAllThreadsAsync, markAdminRead } from "@/lib/message-store";
 
 const ADMIN_KEY = (process.env.ADMIN_KEY || "openspeech-admin-2026").trim();
 
@@ -16,12 +16,12 @@ export async function GET(req: NextRequest) {
     if (key !== ADMIN_KEY) {
       return NextResponse.json({ error: "无权限" }, { status: 403 });
     }
-    const threads = getAllThreads();
+    const threads = await getAllThreadsAsync();
     return NextResponse.json({ threads });
   }
 
   if (userId) {
-    const messages = getMessages(userId);
+    const messages = await getMessagesAsync(userId);
     return NextResponse.json({ messages });
   }
 
