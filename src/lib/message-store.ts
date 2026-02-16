@@ -14,11 +14,18 @@ export interface UserThread {
   lastActivity: string;
 }
 
-// Redis 客户端
-const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
-});
+// Redis 客户端（延迟初始化）
+let redisClient: Redis | null = null;
+
+function getRedis(): Redis {
+  if (!redisClient) {
+    redisClient = new Redis({
+      url: process.env.KV_REST_API_URL!,
+      token: process.env.KV_REST_API_TOKEN!,
+    });
+  }
+  return redisClient;
+}
 
 const THREAD_PREFIX = "thread:";
 const ALL_THREADS_KEY = "all_threads";
@@ -41,6 +48,7 @@ export function addMessage(userId: string, from: "user" | "admin", content: stri
   // 异步保存到 Redis
   (async () => {
     try {
+      const redis = getRedis();
       const threadKey = `${THREAD_PREFIX}${userId}`;
       const existing = await redis.get<UserThread>(threadKey);
       
@@ -73,6 +81,7 @@ export function getMessages(userId: string): ContactMessage[] {
 // 异步获取用户消息
 export async function getMessagesAsync(userId: string): Promise<ContactMessage[]> {
   try {
+    const redis = getRedis();
     const thread = await redis.get<UserThread>(`${THREAD_PREFIX}${userId}`);
     return thread?.messages || [];
   } catch (err) {
@@ -89,6 +98,7 @@ export function getAllThreads(): UserThread[] {
 // 异步获取所有线程
 export async function getAllThreadsAsync(): Promise<UserThread[]> {
   try {
+    const redis = getRedis();
     const allUserIds = await redis.get<string[]>(ALL_THREADS_KEY) || [];
     const threads: UserThread[] = [];
     
@@ -112,6 +122,7 @@ export async function getAllThreadsAsync(): Promise<UserThread[]> {
 export function markAdminRead(userId: string) {
   (async () => {
     try {
+      const redis = getRedis();
       const threadKey = `${THREAD_PREFIX}${userId}`;
       const thread = await redis.get<UserThread>(threadKey);
       
