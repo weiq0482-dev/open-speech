@@ -35,8 +35,8 @@ function generateMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-// 添加消息
-export function addMessage(userId: string, from: "user" | "admin", content: string): ContactMessage {
+// 添加消息（异步，等待 Redis 写入完成）
+export async function addMessage(userId: string, from: "user" | "admin", content: string): Promise<ContactMessage> {
   const msg: ContactMessage = {
     id: generateMessageId(),
     from,
@@ -45,30 +45,27 @@ export function addMessage(userId: string, from: "user" | "admin", content: stri
     read: from === "admin",
   };
 
-  // 异步保存到 Redis
-  (async () => {
-    try {
-      const redis = getRedis();
-      const threadKey = `${THREAD_PREFIX}${userId}`;
-      const existing = await redis.get<UserThread>(threadKey);
-      
-      const thread: UserThread = {
-        userId,
-        messages: existing ? [...existing.messages, msg] : [msg],
-        lastActivity: msg.timestamp,
-      };
+  try {
+    const redis = getRedis();
+    const threadKey = `${THREAD_PREFIX}${userId}`;
+    const existing = await redis.get<UserThread>(threadKey);
+    
+    const thread: UserThread = {
+      userId,
+      messages: existing ? [...existing.messages, msg] : [msg],
+      lastActivity: msg.timestamp,
+    };
 
-      await redis.set(threadKey, thread);
-      
-      const allThreads = await redis.get<string[]>(ALL_THREADS_KEY) || [];
-      if (!allThreads.includes(userId)) {
-        allThreads.push(userId);
-        await redis.set(ALL_THREADS_KEY, allThreads);
-      }
-    } catch (err) {
-      console.error("[Redis addMessage error]", err);
+    await redis.set(threadKey, thread);
+    
+    const allThreads = await redis.get<string[]>(ALL_THREADS_KEY) || [];
+    if (!allThreads.includes(userId)) {
+      allThreads.push(userId);
+      await redis.set(ALL_THREADS_KEY, allThreads);
     }
-  })();
+  } catch (err) {
+    console.error("[Redis addMessage error]", err);
+  }
 
   return msg;
 }

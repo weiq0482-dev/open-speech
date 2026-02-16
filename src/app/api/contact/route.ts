@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       if (adminKey?.trim() !== ADMIN_KEY) {
         return NextResponse.json({ error: "无权限" }, { status: 403 });
       }
-      const msg = addMessage(userId, "admin", message.trim());
+      const msg = await addMessage(userId, "admin", message.trim());
       return NextResponse.json({ success: true, message: msg });
     }
 
@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "缺少用户ID" }, { status: 400 });
     }
 
-    const msg = addMessage(userId, "user", message.trim());
+    const msg = await addMessage(userId, "user", message.trim());
 
     // Webhook 通知管理员
     const webhookUrl = process.env.CONTACT_WEBHOOK_URL;

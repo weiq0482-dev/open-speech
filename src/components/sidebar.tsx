@@ -72,8 +72,8 @@ function ContactChatDialog({
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
-        className="bg-[var(--card)] rounded-2xl w-full max-w-md shadow-xl animate-fade-in flex flex-col"
-        style={{ height: "min(520px, 80vh)" }}
+        className="bg-[var(--card)] rounded-2xl w-full max-w-lg shadow-xl animate-fade-in flex flex-col"
+        style={{ height: "min(600px, 85vh)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -94,19 +94,21 @@ function ContactChatDialog({
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
           {/* 微信联系方式提示 */}
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-3">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center text-xs text-gray-500">
-                二维码
-              </div>
+            <div className="flex items-center gap-4">
+              <img
+                src="/wechat-qr.png"
+                alt="客服微信二维码"
+                className="flex-shrink-0 w-24 h-24 rounded-lg object-contain"
+              />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
                   客服微信
                 </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mb-1">
+                <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">
                   微信号：jryg8686
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400">
-                  如需即时回复，请添加客服微信
+                  扫码或搜索微信号添加客服
                 </p>
               </div>
             </div>
