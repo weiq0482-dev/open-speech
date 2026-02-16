@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { canUse, deductQuota } from "@/lib/quota-store";
 
 export const runtime = "edge";
 
@@ -8,7 +9,7 @@ const IMAGE_MODEL = "gemini-3-pro-image";
 
 // ========== System Prompts ==========
 const SYSTEM_PROMPTS: Record<string, string> = {
-  none: "你是一个 AI 助手，基于 Google Gemini 模型。请用中文回答，除非用户使用其他语言。回复使用 Markdown 格式。",
+  none: "你是 OpenSpeech AI 助手。请用中文回答，除非用户使用其他语言。回复使用 Markdown 格式。",
   "deep-think": "你是一个 AI 助手。请深入思考用户的问题，展示你的推理过程，给出严谨、全面的回答。使用 Markdown 格式。",
   "deep-research": `你是一个深度研究助手。基于搜索结果全面分析问题：
 1. 综合多个来源的信息
@@ -404,31 +405,66 @@ export async function POST(req: NextRequest) {
       generationConfig: userGenConfig,
       customSystemInstruction,
       userApiKey,
+      userId,
     } = body;
 
-    // 优先使用用户传入的 Key，其次使用环境变量
-    const apiKey = userApiKey || process.env.GEMINI_API_KEY || "";
-    // API 地址仅从服务端配置读取，不接受前端传入
+    const isImageGen = tool === "image-gen";
+    const usageType = isImageGen ? "image" as const : "chat" as const;
+
+    // API 地址仅从服务端配置读取
     const apiBase = process.env.GEMINI_API_BASE || "https://4sapi.com";
 
-    if (!apiKey || apiKey === "your-api-key-here") {
-      return new Response(
-        JSON.stringify({ error: "请先配置 API Key", details: "请在「设置」中填入你的 API Key" }),
-        { status: 401, headers: { "Content-Type": "application/json" } }
-      );
+    let apiKey = "";
+    let usingOwnKey = false;
+
+    if (userApiKey && userApiKey !== "your-api-key-here") {
+      // 用户自带 Key，直接使用，不限额
+      apiKey = userApiKey;
+      usingOwnKey = true;
+    } else {
+      // 使用平台 Key，需要检查配额
+      apiKey = process.env.GEMINI_API_KEY || "";
+
+      if (!apiKey) {
+        return new Response(
+          JSON.stringify({ error: "请先配置 API Key 或兑换体验卡", details: "请在「设置」中填入 API Key 或兑换码" }),
+          { status: 401, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // 检查用户配额
+      if (userId) {
+        const check = await canUse(userId, usageType);
+        if (!check.allowed) {
+          return new Response(
+            JSON.stringify({ error: check.reason || "额度不足", quotaExhausted: true }),
+            { status: 429, headers: { "Content-Type": "application/json" } }
+          );
+        }
+      }
     }
 
     // 图片生成使用非流式端点 + 图片模型
-    if (tool === "image-gen") {
-      return handleImageGen(messages, apiBase, apiKey);
+    let response: Response;
+    if (isImageGen) {
+      response = await handleImageGen(messages, apiBase, apiKey);
+    } else {
+      response = await handleStreamingChat(messages, tool, apiBase, apiKey, {
+        gemSystemPrompt,
+        customSystemInstruction,
+        generationConfig: userGenConfig,
+      });
     }
 
-    // 其他功能使用流式端点 + 文本模型
-    return handleStreamingChat(messages, tool, apiBase, apiKey, {
-      gemSystemPrompt,
-      customSystemInstruction,
-      generationConfig: userGenConfig,
-    });
+    // 请求成功后扣减配额（仅平台 Key 用户）
+    if (!usingOwnKey && userId && response.ok) {
+      // 异步扣减，不阻塞响应
+      deductQuota(userId, usageType).catch((err) =>
+        console.error("[deductQuota error]", err)
+      );
+    }
+
+    return response;
   } catch (error) {
     return new Response(
       JSON.stringify({ error: "服务器内部错误", details: String(error) }),

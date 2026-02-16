@@ -17,6 +17,8 @@ import {
   Key,
   Headphones,
   Send,
+  Gift,
+  Zap,
 } from "lucide-react";
 
 interface ContactMsg {
@@ -202,11 +204,43 @@ export function Sidebar() {
   const [contactStatus, setContactStatus] = useState<"" | "success" | "error">(""  );
   const [unreadCount, setUnreadCount] = useState(0);
   const lastSeenCountRef = useRef(0);
+  const [sidebarKeyInput, setSidebarKeyInput] = useState("");
+  const [sidebarKeyMsg, setSidebarKeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [showNewGem, setShowNewGem] = useState(false);
   const [newGemName, setNewGemName] = useState("");
   const [newGemIcon, setNewGemIcon] = useState("🤖");
   const [newGemDesc, setNewGemDesc] = useState("");
   const [newGemPrompt, setNewGemPrompt] = useState("");
+
+  const handleSidebarKeySubmit = async () => {
+    const val = sidebarKeyInput.trim();
+    if (!val) return;
+    if (/^OS-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(val)) {
+      setSidebarKeyMsg({ ok: true, text: "验证中..." });
+      try {
+        const r = await fetch("/api/redeem", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, code: val }),
+        });
+        const data = await r.json();
+        if (r.ok && data.success) {
+          setSidebarKeyMsg({ ok: true, text: data.message });
+          setSidebarKeyInput("");
+          setUserApiKey("");
+        } else {
+          setSidebarKeyMsg({ ok: false, text: data.error || "兑换失败" });
+        }
+      } catch {
+        setSidebarKeyMsg({ ok: false, text: "网络错误" });
+      }
+    } else {
+      setUserApiKey(val);
+      setSidebarKeyInput("");
+      setSidebarKeyMsg({ ok: true, text: "API Key 已保存" });
+    }
+    setTimeout(() => setSidebarKeyMsg(null), 4000);
+  };
 
   const handleCreateGem = () => {
     if (!newGemName.trim() || !newGemPrompt.trim()) return;
@@ -467,7 +501,7 @@ export function Sidebar() {
             <span>{darkMode ? "浅色模式" : "深色模式"}</span>
           </button>
 
-          {/* API Key */}
+          {/* API Key / 兑换码 */}
           <button
             onClick={() => setShowApiKeyInput(!showApiKeyInput)}
             className={cn(
@@ -476,28 +510,44 @@ export function Sidebar() {
             )}
           >
             <Key size={18} />
-            <span>API Key</span>
+            <span>Key / 兑换码</span>
             {userApiKey && (
               <span className="ml-auto text-[10px] text-green-600 dark:text-green-400">已配置</span>
             )}
           </button>
           {showApiKeyInput && (
-            <div className="px-2 pb-1 animate-fade-in">
-              <div className="relative">
+            <div className="px-2 pb-2 animate-fade-in space-y-1.5">
+              <div className="flex gap-1">
                 <input
-                  type={showApiKey ? "text" : "password"}
-                  value={userApiKey}
-                  onChange={(e) => setUserApiKey(e.target.value)}
-                  placeholder="输入你的 API Key"
-                  className="w-full px-3 py-2 pr-12 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-gemini-blue"
+                  type="text"
+                  value={sidebarKeyInput}
+                  onChange={(e) => setSidebarKeyInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSidebarKeySubmit()}
+                  placeholder="API Key 或兑换码 (OS-XXXX-XXXX)"
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500"
                 />
                 <button
-                  onClick={() => setShowApiKey(!showApiKey)}
-                  className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-[var(--muted)] hover:text-[var(--foreground)] px-1.5 py-0.5 rounded hover:bg-[var(--sidebar-hover)]"
+                  onClick={handleSidebarKeySubmit}
+                  disabled={!sidebarKeyInput.trim()}
+                  className={cn(
+                    "px-2 py-1.5 rounded-lg text-white text-[10px] shrink-0",
+                    sidebarKeyInput.trim()
+                      ? /^OS-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(sidebarKeyInput.trim()) ? "bg-amber-500" : "bg-blue-500"
+                      : "bg-gray-300"
+                  )}
                 >
-                  {showApiKey ? "隐藏" : "显示"}
+                  {/^OS-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(sidebarKeyInput.trim()) ? "兑换" : "保存"}
                 </button>
               </div>
+              {sidebarKeyMsg && (
+                <p className={cn("text-[10px]", sidebarKeyMsg.ok ? "text-green-600" : "text-red-500")}>{sidebarKeyMsg.text}</p>
+              )}
+              {userApiKey && (
+                <div className="flex items-center justify-between text-[10px]">
+                  <span className="text-green-600 dark:text-green-400">Key: •••{userApiKey.slice(-6)}</span>
+                  <button onClick={() => setUserApiKey("")} className="text-red-500">清除</button>
+                </div>
+              )}
             </div>
           )}
 

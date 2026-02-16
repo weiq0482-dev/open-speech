@@ -479,7 +479,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
 
       {/* Disclaimer */}
       <div className="text-center mt-2 text-[10px] text-[var(--muted)]">
-        Gemini 大模型尝鲜体验、仅供交流学习
+        AI 助手仅供交流学习、内容仅供参考
       </div>
     </div>
   );

@@ -218,6 +218,7 @@ export default function Home() {
             generationConfig,
             customSystemInstruction: customSystemInstruction || undefined,
             userApiKey: userApiKey || undefined,
+            userId,
           }),
           signal: abortController.signal,
         });
@@ -408,7 +409,7 @@ export default function Home() {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMessages, tool: "image-gen", userApiKey: userApiKey || undefined }),
+          body: JSON.stringify({ messages: apiMessages, tool: "image-gen", userApiKey: userApiKey || undefined, userId }),
         });
 
         if (!response.ok) {
@@ -478,7 +479,7 @@ export default function Home() {
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ messages: apiMessages, tool: "image-gen", userApiKey: userApiKey || undefined }),
+          body: JSON.stringify({ messages: apiMessages, tool: "image-gen", userApiKey: userApiKey || undefined, userId }),
         });
 
         if (!response.ok) {
@@ -555,15 +556,34 @@ export default function Home() {
 
                 {/* Welcome banner */}
                 <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-left max-w-xl mx-auto">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm font-medium mb-1">
-                        欢迎使用 <span className="gemini-gradient font-semibold">OpenSpeech</span>，你的 AI 助手
-                      </p>
-                      <p className="text-xs text-[var(--muted)]">
-                        基于 Gemini 大模型，支持多轮对话、文件上传、代码高亮、Deep Research 等功能。
-                      </p>
+                  <p className="text-sm font-medium mb-1">
+                    欢迎使用 <span className="gemini-gradient font-semibold">OpenSpeech</span>，你的 AI 助手
+                  </p>
+                  <p className="text-xs text-[var(--muted)] mb-3">
+                    支持多轮对话、文件上传、代码高亮、深度研究等功能。
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="p-2 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("deep-think"); }}>
+                      <span className="text-lg">🧠</span>
+                      <p className="mt-0.5">深度推理</p>
                     </div>
+                    <div className="p-2 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("image-gen"); }}>
+                      <span className="text-lg">🎨</span>
+                      <p className="mt-0.5">AI 生图</p>
+                    </div>
+                    <div className="p-2 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("deep-research"); }}>
+                      <span className="text-lg">🔍</span>
+                      <p className="mt-0.5">深度研究</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 抖音引导 */}
+                <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] max-w-xl mx-auto flex items-center gap-4">
+                  <img src="/douyin-qr.png" alt="抖音" className="w-16 h-16 rounded-lg shrink-0" />
+                  <div className="text-left flex-1">
+                    <p className="text-xs font-medium">关注抖音号 arch8288</p>
+                    <p className="text-[10px] text-[var(--muted)] mt-0.5">获取免费体验卡 · 教程 · 最新功能更新</p>
                   </div>
                 </div>
               </div>
@@ -623,22 +643,33 @@ export default function Home() {
             className="bg-[var(--card)] rounded-2xl p-6 max-w-sm w-full text-center shadow-xl animate-fade-in"
             onClick={(e) => e.stopPropagation()}
           >
-            <p className="text-sm text-red-500 dark:text-red-400 mb-4">API 额度已用尽</p>
+            <p className="text-sm text-red-500 dark:text-red-400 mb-3">额度不足</p>
+            <p className="text-xs text-[var(--muted)] mb-4">
+              免费用户每日 5 次对话，兑换体验卡或填入 API Key 可解锁更多次数
+            </p>
             <img
               src="/douyin-qr.png"
               alt="抖音二维码"
-              className="w-64 h-auto mx-auto rounded-xl mb-4"
+              className="w-52 h-auto mx-auto rounded-xl mb-3"
             />
             <p className="text-base font-semibold mb-1">抖音号：arch8288</p>
             <p className="text-sm text-[var(--muted)] mb-4">
-              后台私信获取 · 小黄车购买
+              关注获取兑换码 · 小黄车购买体验卡
             </p>
-            <button
-              onClick={() => setShowPromo(false)}
-              className="w-full px-4 py-2 rounded-xl bg-gemini-blue text-white text-sm hover:opacity-90 transition-opacity"
-            >
-              我知道了
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowPromo(false)}
+                className="flex-1 px-4 py-2 rounded-xl border border-[var(--border)] text-sm hover:bg-[var(--sidebar-hover)] transition-colors"
+              >
+                我知道了
+              </button>
+              <button
+                onClick={() => { setShowPromo(false); useChatStore.getState().toggleSettingsPanel(); }}
+                className="flex-1 px-4 py-2 rounded-xl bg-blue-500 text-white text-sm hover:bg-blue-600 transition-colors"
+              >
+                去兑换
+              </button>
+            </div>
           </div>
         </div>
       )}

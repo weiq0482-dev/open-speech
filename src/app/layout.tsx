@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "OpenSpeech - AI 助手",
-  description: "基于 Gemini 的智能 AI 助手",
+  description: "智能 AI 助手",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
