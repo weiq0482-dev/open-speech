@@ -92,6 +92,26 @@ function ContactChatDialog({
 
         {/* Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+          {/* 微信联系方式提示 */}
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-3">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-16 h-16 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center text-xs text-gray-500">
+                二维码
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-1">
+                  客服微信
+                </p>
+                <p className="text-xs text-blue-700 dark:text-blue-300 mb-1">
+                  微信号：jryg8686
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  如需即时回复，请添加客服微信
+                </p>
+              </div>
+            </div>
+          </div>
+
           {messages.length === 0 && (
             <p className="text-center text-sm text-[var(--muted)] py-8">
               有问题随时发消息，客服会尽快回复您
