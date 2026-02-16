@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addMessage, getMessages, getAllThreads, markAdminRead } from "@/lib/message-store";
 
-const ADMIN_KEY = process.env.ADMIN_KEY || "openspeech-admin-2026";
+const ADMIN_KEY = (process.env.ADMIN_KEY || "openspeech-admin-2026").trim();
 
 // GET: 获取消息
 // ?userId=xxx      → 获取该用户的对话记录
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     // 管理员回复
     if (action === "reply") {
-      if (adminKey !== ADMIN_KEY) {
+      if (adminKey?.trim() !== ADMIN_KEY) {
         return NextResponse.json({ error: "无权限" }, { status: 403 });
       }
       const msg = addMessage(userId, "admin", message.trim());
@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     // 管理员已读标记
     if (action === "markRead") {
-      if (adminKey !== ADMIN_KEY) {
+      if (adminKey?.trim() !== ADMIN_KEY) {
         return NextResponse.json({ error: "无权限" }, { status: 403 });
       }
       markAdminRead(userId);
