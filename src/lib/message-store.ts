@@ -15,28 +15,49 @@ export interface UserThread {
   lastActivity: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const DATA_FILE = path.join(DATA_DIR, "messages.json");
+// 优先用 data/ (本地开发)，其次 /tmp (Vercel)，最后内存兜底
+const LOCAL_DIR = path.join(process.cwd(), "data");
+const TMP_FILE = "/tmp/openspeech-messages.json";
+let memoryStore: Record<string, ContactMessage[]> = {};
 
-function ensureDataDir() {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+function getDataFile(): string | null {
+  // 本地开发: 用 data/ 目录
+  try {
+    if (!fs.existsSync(LOCAL_DIR)) fs.mkdirSync(LOCAL_DIR, { recursive: true });
+    return path.join(LOCAL_DIR, "messages.json");
+  } catch {}
+  // Vercel: 用 /tmp
+  try {
+    fs.accessSync("/tmp", fs.constants.W_OK);
+    return TMP_FILE;
+  } catch {}
+  return null;
 }
 
 function loadAll(): Record<string, ContactMessage[]> {
-  ensureDataDir();
-  if (!fs.existsSync(DATA_FILE)) return {};
-  try {
-    return JSON.parse(fs.readFileSync(DATA_FILE, "utf-8"));
-  } catch {
-    return {};
+  const file = getDataFile();
+  if (file) {
+    try {
+      if (fs.existsSync(file)) {
+        const data = JSON.parse(fs.readFileSync(file, "utf-8"));
+        memoryStore = data;
+        return data;
+      }
+    } catch {}
   }
+  return { ...memoryStore };
 }
 
 function saveAll(data: Record<string, ContactMessage[]>) {
-  ensureDataDir();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2), "utf-8");
+  memoryStore = data;
+  const file = getDataFile();
+  if (file) {
+    try {
+      fs.writeFileSync(file, JSON.stringify(data, null, 2), "utf-8");
+    } catch (err) {
+      console.error("[message-store] write failed:", err);
+    }
+  }
 }
 
 export function addMessage(userId: string, from: "user" | "admin", content: string): ContactMessage {

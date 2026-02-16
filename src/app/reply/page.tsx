@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 interface Message {
@@ -10,7 +10,7 @@ interface Message {
   timestamp: string;
 }
 
-export default function ReplyPage() {
+function ReplyContent() {
   const searchParams = useSearchParams();
   const userId = searchParams.get("u") || "";
   const adminKey = searchParams.get("k") || "";
@@ -141,5 +141,13 @@ export default function ReplyPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ReplyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50"><p className="text-gray-400">加载中...</p></div>}>
+      <ReplyContent />
+    </Suspense>
   );
 }

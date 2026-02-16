@@ -1,0 +1,6 @@
+dist-electron/
+electron/
+.next/
+data/
+*.exe
+*.pack
