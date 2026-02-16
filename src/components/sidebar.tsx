@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useChatStore, MODE_CONFIGS, GenerationMode } from "@/store/chat-store";
 import { cn } from "@/lib/utils";
 import {
@@ -16,7 +16,138 @@ import {
   Gem,
   Key,
   Headphones,
+  Send,
 } from "lucide-react";
+
+interface ContactMsg {
+  id: string;
+  from: "user" | "admin";
+  content: string;
+  timestamp: string;
+}
+
+function ContactChatDialog({
+  userId,
+  contactMsg,
+  setContactMsg,
+  contactSending,
+  onSend,
+  onClose,
+}: {
+  userId: string;
+  contactMsg: string;
+  setContactMsg: (v: string) => void;
+  contactSending: boolean;
+  onSend: () => void;
+  onClose: () => void;
+}) {
+  const [messages, setMessages] = useState<ContactMsg[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      const resp = await fetch(`/api/contact?userId=${encodeURIComponent(userId)}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setMessages(data.messages || []);
+      }
+    } catch {}
+  }, [userId]);
+
+  useEffect(() => {
+    fetchMessages();
+    const timer = setInterval(fetchMessages, 3000);
+    return () => clearInterval(timer);
+  }, [fetchMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = () => {
+    onSend();
+    setTimeout(fetchMessages, 500);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div
+        className="bg-[var(--card)] rounded-2xl w-full max-w-md shadow-xl animate-fade-in flex flex-col"
+        style={{ height: "min(520px, 80vh)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] shrink-0">
+          <div>
+            <h3 className="text-base font-semibold">联系客服</h3>
+            <p className="text-[10px] text-[var(--muted)]">消息会实时送达，客服将尽快回复</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)]"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2.5">
+          {messages.length === 0 && (
+            <p className="text-center text-sm text-[var(--muted)] py-8">
+              有问题随时发消息，客服会尽快回复您
+            </p>
+          )}
+          {messages.map((msg) => (
+            <div key={msg.id} className={`flex ${msg.from === "admin" ? "justify-start" : "justify-end"}`}>
+              <div
+                className={cn(
+                  "max-w-[75%] px-3 py-2 rounded-2xl text-sm",
+                  msg.from === "admin"
+                    ? "bg-[var(--sidebar-hover)] text-[var(--foreground)]"
+                    : "bg-gemini-blue text-white"
+                )}
+              >
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+                <p className={cn(
+                  "text-[10px] mt-1",
+                  msg.from === "admin" ? "text-[var(--muted)]" : "text-blue-100"
+                )}>
+                  {new Date(msg.timestamp).toLocaleString("zh-CN")}
+                </p>
+              </div>
+            </div>
+          ))}
+          <div ref={messagesEndRef} />
+        </div>
+
+        {/* Input */}
+        <div className="px-4 py-3 border-t border-[var(--border)] shrink-0">
+          <div className="flex gap-2">
+            <input
+              value={contactMsg}
+              onChange={(e) => setContactMsg(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
+              placeholder="输入消息..."
+              className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-gemini-blue"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!contactMsg.trim() || contactSending}
+              className={cn(
+                "p-2.5 rounded-xl text-white transition-colors",
+                contactMsg.trim() && !contactSending
+                  ? "bg-gemini-blue hover:bg-blue-600"
+                  : "bg-gray-300 cursor-not-allowed"
+              )}
+            >
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Sidebar() {
   const {
@@ -37,12 +168,18 @@ export function Sidebar() {
     setActiveMode,
     userApiKey,
     setUserApiKey,
+    userId,
   } = useChatStore();
 
   const [showGems, setShowGems] = useState(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
   const [showContact, setShowContact] = useState(false);
+  const [contactMsg, setContactMsg] = useState("");
+  const [contactSending, setContactSending] = useState(false);
+  const [contactStatus, setContactStatus] = useState<"" | "success" | "error">(""  );
+  const [unreadCount, setUnreadCount] = useState(0);
+  const lastSeenCountRef = useRef(0);
   const [showNewGem, setShowNewGem] = useState(false);
   const [newGemName, setNewGemName] = useState("");
   const [newGemIcon, setNewGemIcon] = useState("🤖");
@@ -62,6 +199,63 @@ export function Sidebar() {
     setNewGemDesc("");
     setNewGemPrompt("");
     setShowNewGem(false);
+  };
+
+  // 轮询未读消息
+  const checkUnread = useCallback(async () => {
+    if (!userId || showContact) return;
+    try {
+      const resp = await fetch(`/api/contact?userId=${encodeURIComponent(userId)}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        const adminMsgCount = (data.messages || []).filter((m: { from: string }) => m.from === "admin").length;
+        const newUnread = adminMsgCount - lastSeenCountRef.current;
+        setUnreadCount(newUnread > 0 ? newUnread : 0);
+      }
+    } catch {}
+  }, [userId, showContact]);
+
+  useEffect(() => {
+    checkUnread();
+    const timer = setInterval(checkUnread, 5000);
+    return () => clearInterval(timer);
+  }, [checkUnread]);
+
+  // 打开客服窗口时清除红点
+  const handleOpenContact = () => {
+    setShowContact(true);
+    setUnreadCount(0);
+    // 记录当前已看到的管理员消息数
+    fetch(`/api/contact?userId=${encodeURIComponent(userId)}`)
+      .then(r => r.json())
+      .then(data => {
+        const adminMsgCount = (data.messages || []).filter((m: { from: string }) => m.from === "admin").length;
+        lastSeenCountRef.current = adminMsgCount;
+      })
+      .catch(() => {});
+  };
+
+  const handleSendContact = async () => {
+    if (!contactMsg.trim() || contactSending) return;
+    setContactSending(true);
+    setContactStatus("");
+    try {
+      const resp = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, message: contactMsg.trim() }),
+      });
+      if (resp.ok) {
+        setContactStatus("success");
+        setContactMsg("");
+      } else {
+        setContactStatus("error");
+      }
+    } catch {
+      setContactStatus("error");
+    } finally {
+      setContactSending(false);
+    }
   };
 
   const handleGemClick = (gemId: string) => {
@@ -287,11 +481,16 @@ export function Sidebar() {
 
           {/* 联系客服 */}
           <button
-            onClick={() => setShowContact(true)}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm"
+            onClick={handleOpenContact}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm relative"
           >
             <Headphones size={18} />
             <span>联系客服</span>
+            {unreadCount > 0 && (
+              <span className="absolute right-3 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5 min-w-[18px] text-center">
+                {unreadCount}
+              </span>
+            )}
           </button>
         </div>
       </aside>
@@ -366,30 +565,16 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* 联系客服弹窗 */}
+      {/* 联系客服聊天窗口 */}
       {showContact && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowContact(false)}>
-          <div
-            className="bg-[var(--card)] rounded-2xl p-6 max-w-sm w-full text-center shadow-xl animate-fade-in"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <p className="text-base font-semibold mb-4">微信扫码联系客服</p>
-            <img
-              src="/wechat-qr.png"
-              alt="微信二维码"
-              className="w-64 h-auto mx-auto rounded-xl mb-4"
-            />
-            <p className="text-sm text-[var(--muted)] mb-4">
-              扫码添加微信 · 咨询充值与使用问题
-            </p>
-            <button
-              onClick={() => setShowContact(false)}
-              className="w-full px-4 py-2 rounded-xl bg-gemini-blue text-white text-sm hover:opacity-90 transition-opacity"
-            >
-              我知道了
-            </button>
-          </div>
-        </div>
+        <ContactChatDialog
+          userId={userId}
+          contactMsg={contactMsg}
+          setContactMsg={setContactMsg}
+          contactSending={contactSending}
+          onSend={handleSendContact}
+          onClose={() => setShowContact(false)}
+        />
       )}
     </>
   );

@@ -5,7 +5,92 @@ import { useChatStore, type Attachment } from "@/store/chat-store";
 import { Sidebar } from "@/components/sidebar";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessage } from "@/components/chat-message";
-import { Menu, SquarePen, Sparkles } from "lucide-react";
+import { Menu, SquarePen, Sparkles, Headphones, Send, X } from "lucide-react";
+
+function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => void }) {
+  const [messages, setMessages] = useState<{ id: string; from: string; content: string; timestamp: string }[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const endRef = useRef<HTMLDivElement>(null);
+
+  const fetchMsgs = useCallback(async () => {
+    try {
+      const r = await fetch(`/api/contact?userId=${encodeURIComponent(userId)}`);
+      if (r.ok) { const d = await r.json(); setMessages(d.messages || []); }
+    } catch {}
+  }, [userId]);
+
+  useEffect(() => { fetchMsgs(); const t = setInterval(fetchMsgs, 3000); return () => clearInterval(t); }, [fetchMsgs]);
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || sending) return;
+    setSending(true);
+    try {
+      await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, message: input.trim() }),
+      });
+      setInput("");
+      setTimeout(fetchMsgs, 300);
+    } catch {}
+    setSending(false);
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-40 w-80 shadow-2xl rounded-2xl border border-[var(--border)] bg-[var(--card)] flex flex-col animate-fade-in"
+      style={{ height: "420px" }}>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] shrink-0">
+        <div className="flex items-center gap-2">
+          <Headphones size={16} className="text-gemini-blue" />
+          <span className="text-sm font-semibold">客服消息</span>
+        </div>
+        <button onClick={onClose} className="p-1 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)]">
+          <X size={16} />
+        </button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2">
+        {messages.length === 0 && <p className="text-center text-xs text-[var(--muted)] py-6">暂无消息</p>}
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex ${msg.from === "admin" ? "justify-start" : "justify-end"}`}>
+            <div className={`max-w-[75%] px-3 py-1.5 rounded-xl text-xs ${
+              msg.from === "admin"
+                ? "bg-[var(--sidebar-hover)] text-[var(--foreground)]"
+                : "bg-gemini-blue text-white"
+            }`}>
+              <p className="whitespace-pre-wrap">{msg.content}</p>
+              <p className={`text-[9px] mt-0.5 ${msg.from === "admin" ? "text-[var(--muted)]" : "text-blue-100"}`}>
+                {new Date(msg.timestamp).toLocaleTimeString("zh-CN")}
+              </p>
+            </div>
+          </div>
+        ))}
+        <div ref={endRef} />
+      </div>
+      <div className="px-3 py-2 border-t border-[var(--border)] shrink-0">
+        <div className="flex gap-1.5">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            placeholder="输入消息..."
+            className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-gemini-blue"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim() || sending}
+            className={`p-1.5 rounded-lg text-white transition-colors ${
+              input.trim() && !sending ? "bg-gemini-blue" : "bg-gray-300"
+            }`}
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Home() {
   const {
@@ -23,11 +108,42 @@ export default function Home() {
     setIsGenerating,
     activeGemId,
     userApiKey,
+    userId,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeConv = getActiveConversation();
+
+  // 客服消息通知
+  const [notifyMsg, setNotifyMsg] = useState<{ content: string; time: string } | null>(null);
+  const [showContactChat, setShowContactChat] = useState(false);
+  const lastAdminCountRef = useRef(-1);
+
+  useEffect(() => {
+    if (!userId) return;
+    const checkNewReply = async () => {
+      try {
+        const resp = await fetch(`/api/contact?userId=${encodeURIComponent(userId)}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const adminMsgs = (data.messages || []).filter((m: { from: string }) => m.from === "admin");
+        if (lastAdminCountRef.current === -1) {
+          lastAdminCountRef.current = adminMsgs.length;
+          return;
+        }
+        if (adminMsgs.length > lastAdminCountRef.current) {
+          const latest = adminMsgs[adminMsgs.length - 1];
+          setNotifyMsg({ content: latest.content, time: new Date(latest.timestamp).toLocaleTimeString("zh-CN") });
+          lastAdminCountRef.current = adminMsgs.length;
+          setTimeout(() => setNotifyMsg(null), 8000);
+        }
+      } catch {}
+    };
+    checkNewReply();
+    const timer = setInterval(checkNewReply, 3000);
+    return () => clearInterval(timer);
+  }, [userId]);
   const [showPromo, setShowPromo] = useState(false);
 
   // Scroll to bottom
@@ -476,6 +592,29 @@ export default function Home() {
           <ChatInput onSend={handleSend} disabled={isGenerating} onStop={handleStop} />
         </div>
       </main>
+
+      {/* 客服消息通知气泡 */}
+      {notifyMsg && !showContactChat && (
+        <div
+          className="fixed bottom-20 right-6 z-40 max-w-xs animate-fade-in cursor-pointer"
+          onClick={() => { setNotifyMsg(null); setShowContactChat(true); }}
+        >
+          <div className="bg-[var(--card)] rounded-2xl shadow-2xl border border-[var(--border)] p-4">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+              <span className="text-xs font-medium">客服回复</span>
+              <span className="text-[10px] text-[var(--muted)] ml-auto">{notifyMsg.time}</span>
+            </div>
+            <p className="text-sm line-clamp-3">{notifyMsg.content}</p>
+            <p className="text-[10px] text-gemini-blue mt-2">点击查看对话 →</p>
+          </div>
+        </div>
+      )}
+
+      {/* 右下角客服聊天小窗 */}
+      {showContactChat && (
+        <ContactMiniChat userId={userId} onClose={() => setShowContactChat(false)} />
+      )}
 
       {/* 推广弹窗 */}
       {showPromo && (
