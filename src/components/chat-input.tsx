@@ -20,7 +20,9 @@ import {
   Code,
   FileSearch,
   Sparkles,
+  Pencil,
 } from "lucide-react";
+import { ImageEditor } from "@/components/image-editor";
 
 const TOOLS: { id: ToolMode; label: string; icon: React.ReactNode; desc: string }[] = [
   { id: "deep-think", label: "Deep Think", icon: <Brain size={16} />, desc: "深度推理，展示思考过程" },
@@ -58,6 +60,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
   const [showTools, setShowTools] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [imageResolution, setImageResolution] = useState<"standard" | "2k" | "4k">("standard");
+  const [editingImage, setEditingImage] = useState<{ id: string; url: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -239,11 +242,22 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
               className="relative group rounded-xl border border-[var(--border)] overflow-hidden bg-[var(--card)]"
             >
               {att.type === "image" ? (
-                <img
-                  src={att.url}
-                  alt={att.name}
-                  className="h-20 w-20 object-cover"
-                />
+                <>
+                  <img
+                    src={att.url}
+                    alt={att.name}
+                    className="h-20 w-20 object-cover cursor-pointer"
+                    onClick={() => setEditingImage({ id: att.id, url: att.url })}
+                    title="点击标注编辑"
+                  />
+                  <button
+                    onClick={() => setEditingImage({ id: att.id, url: att.url })}
+                    className="absolute bottom-1 left-1 p-1 rounded-full bg-blue-500 text-white opacity-80 hover:opacity-100 transition-opacity"
+                    title="标注编辑"
+                  >
+                    <Pencil size={10} />
+                  </button>
+                </>
               ) : (
                 <div className="h-20 w-20 flex flex-col items-center justify-center gap-1 px-2">
                   <FileText size={24} className="text-[var(--muted)]" />
@@ -509,6 +523,24 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
       <div className="text-center mt-2 text-[10px] text-[var(--muted)]">
         AI 助手仅供交流学习、内容仅供参考
       </div>
+
+      {/* Image annotation editor */}
+      {editingImage && (
+        <ImageEditor
+          imageSrc={editingImage.url}
+          onSave={(annotatedUrl) => {
+            setAttachments((prev) =>
+              prev.map((att) =>
+                att.id === editingImage.id
+                  ? { ...att, url: annotatedUrl, name: att.name.replace(/(\.\w+)$/, "-标注$1") }
+                  : att
+              )
+            );
+            setEditingImage(null);
+          }}
+          onClose={() => setEditingImage(null)}
+        />
+      )}
     </div>
   );
 }

@@ -167,9 +167,12 @@ function GeneratedImages({
       {editingIdx !== null && onEditImage && (
         <ImageEditor
           imageSrc={images[editingIdx]}
-          onSubmit={(annotatedUrl, instruction) => {
+          onSave={(annotatedUrl) => {
             setEditingIdx(null);
-            onEditImage(annotatedUrl, instruction);
+            const instruction = window.prompt("描述要修改的内容，如「把标记区域改成蓝色天空」");
+            if (instruction?.trim()) {
+              onEditImage(annotatedUrl, instruction.trim());
+            }
           }}
           onClose={() => setEditingIdx(null)}
         />
