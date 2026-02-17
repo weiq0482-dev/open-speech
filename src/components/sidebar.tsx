@@ -19,7 +19,11 @@ import {
   Send,
   Gift,
   Zap,
+  LogIn,
+  LogOut,
+  Mail,
 } from "lucide-react";
+import { AuthDialog } from "./auth-dialog";
 
 interface ContactMsg {
   id: string;
@@ -197,6 +201,9 @@ export function Sidebar() {
     userApiKey,
     setUserApiKey,
     userId,
+    authToken,
+    userEmail,
+    logout: doLogout,
   } = useChatStore();
 
   const [showGems, setShowGems] = useState(false);
@@ -212,6 +219,7 @@ export function Sidebar() {
   const [sidebarKeyMsg, setSidebarKeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [showNewGem, setShowNewGem] = useState(false);
   const [siteConfig, setSiteConfig] = useState<{ contactQrUrl?: string; contactWechatId?: string } | null>(null);
+  const [showAuth, setShowAuth] = useState(false);
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(d => setSiteConfig(d.config)).catch(() => {});
@@ -510,6 +518,29 @@ export function Sidebar() {
             <span>{darkMode ? "浅色模式" : "深色模式"}</span>
           </button>
 
+          {/* 登录/账户 */}
+          {userEmail ? (
+            <div className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm">
+              <Mail size={18} className="text-green-500 shrink-0" />
+              <span className="truncate text-xs text-[var(--muted)]">{userEmail}</span>
+              <button
+                onClick={doLogout}
+                className="ml-auto p-1 rounded-lg text-[var(--muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                title="退出登录"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAuth(true)}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm text-blue-500"
+            >
+              <LogIn size={18} />
+              <span>邮箱登录 / 注册</span>
+            </button>
+          )}
+
           {/* API Key / 兑换码 */}
           <button
             onClick={() => setShowApiKeyInput(!showApiKeyInput)}
@@ -645,6 +676,9 @@ export function Sidebar() {
           </div>
         </div>
       )}
+
+      {/* 邮箱登录弹窗 */}
+      <AuthDialog open={showAuth} onClose={() => setShowAuth(false)} />
 
       {/* 联系客服聊天窗口 */}
       {showContact && (

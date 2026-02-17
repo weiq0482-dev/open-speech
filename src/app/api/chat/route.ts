@@ -487,8 +487,8 @@ export async function POST(req: NextRequest) {
     const isImageGen = tool === "image-gen";
     const usageType = isImageGen ? "image" as const : "chat" as const;
 
-    // userId 格式校验：不匹配设备 API 格式时，当作匿名用户（仅走 IP 限制）
-    const validUserId = userId && /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(userId) ? userId : null;
+    // userId 格式校验：支持设备用户（u_开头）和邮箱用户（em_开头），不匹配时当匿名用户
+    const validUserId = userId && (/^u_[a-f0-9]{12}_[a-z0-9]+$/.test(userId) || /^em_[a-f0-9]{16}$/.test(userId)) ? userId : null;
 
     // API 地址仅从服务端配置读取
     const apiBase = process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com";

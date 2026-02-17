@@ -179,6 +179,9 @@ interface ChatState {
   userApiBase: string;
   // 用户标识（自动生成，用于消息推送和客服通信）
   userId: string;
+  // 邮箱登录态
+  authToken: string;
+  userEmail: string;
 
   // Actions
   createConversation: (gemId?: string) => string;
@@ -208,6 +211,9 @@ interface ChatState {
   setUserApiBase: (base: string) => void;
   setUserId: (id: string) => void;
   clearAllConversations: () => void;
+  // 邮箱登录
+  login: (token: string, email: string, userId: string) => void;
+  logout: () => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -228,6 +234,8 @@ export const useChatStore = create<ChatState>()(
   userApiKey: "",
   userApiBase: "",
   userId: typeof crypto !== "undefined" ? crypto.randomUUID() : generateId(),
+  authToken: "",
+  userEmail: "",
 
   createConversation: (gemId?: string) => {
     const id = generateId();
@@ -375,6 +383,8 @@ export const useChatStore = create<ChatState>()(
   setUserApiKey: (key) => set({ userApiKey: key }),
   setUserApiBase: (base) => set({ userApiBase: base }),
   setUserId: (id) => set({ userId: id }),
+  login: (token, email, userId) => set({ authToken: token, userEmail: email, userId }),
+  logout: () => set({ authToken: "", userEmail: "" }),
   clearAllConversations: () =>
     set({ conversations: [], activeConversationId: null }),
 }),
@@ -410,6 +420,8 @@ export const useChatStore = create<ChatState>()(
         userApiKey: state.userApiKey,
         userApiBase: state.userApiBase,
         userId: state.userId,
+        authToken: state.authToken,
+        userEmail: state.userEmail,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;
