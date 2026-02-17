@@ -555,7 +555,7 @@ export default function Home() {
                 </div>
 
                 {/* Welcome banner */}
-                <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-left max-w-xl mx-auto">
+                <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-left max-w-2xl mx-auto">
                   <p className="text-sm font-medium mb-1">
                     欢迎使用 <span className="app-gradient font-semibold">OpenSpeech</span>，你的 AI 助手
                   </p>
@@ -592,7 +592,7 @@ export default function Home() {
                   <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] flex flex-col items-center text-center gap-3">
                     <img src="/wechat-qr.png" alt="微信群" className="w-32 h-32 rounded-xl" />
                     <div>
-                      <p className="text-sm font-semibold">加入「超级梦想家」群</p>
+                      <p className="text-sm font-semibold">加入「Open-speech 超级梦想家」群</p>
                       <p className="text-[11px] text-[var(--muted)] mt-1">微信扫码 · 把想法变成现实</p>
                     </div>
                   </div>
