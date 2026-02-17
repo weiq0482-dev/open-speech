@@ -290,7 +290,7 @@ export default function Home() {
               if (data === "[DONE]") continue;
               try {
                 const json = JSON.parse(data);
-                console.log("[SSE event]", Object.keys(json), json.text?.slice(0, 50) || json.thinking?.slice(0, 50) || "");
+                // SSE event parsed
 
                 if (json.thinking) {
                   fullThinking += json.thinking;

@@ -265,10 +265,15 @@ export function SettingsPanel() {
           </div>
         </div>
 
-        {/* 版本信息 */}
-        <div className="p-4 border-t border-[var(--border)] text-center">
+        {/* 合规链接 + 版本信息 */}
+        <div className="p-4 border-t border-[var(--border)] text-center space-y-2">
+          <div className="flex justify-center gap-3 text-[10px]">
+            <a href="/terms" target="_blank" className="text-[var(--muted)] hover:text-[var(--foreground)] underline">用户协议</a>
+            <a href="/privacy" target="_blank" className="text-[var(--muted)] hover:text-[var(--foreground)] underline">隐私政策</a>
+            <a href="/redeem-rules" target="_blank" className="text-[var(--muted)] hover:text-[var(--foreground)] underline">兑换规则</a>
+          </div>
           <p className="text-[10px] text-[var(--muted)]">
-            OpenSpeech v0.1.0
+            OpenSpeech v0.1.0 · 本产品不提供应用内支付
           </p>
         </div>
       </div>

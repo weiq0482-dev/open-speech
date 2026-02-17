@@ -7,6 +7,8 @@ export interface CouponData {
   imageQuota: number;
   durationDays: number;
   createdAt: string;
+  expiresAt?: string;   // 兑换码本身的有效期（未使用过期作废）
+  batchId?: string;     // 生成批次标识
   usedBy?: string;
   usedAt?: string;
 }
@@ -192,10 +194,25 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
     return { success: false, message: "该兑换码已被使用" };
   }
 
+  // 检查兑换码是否过期（未使用的兑换码有有效期）
+  if (coupon.expiresAt && new Date(coupon.expiresAt) < new Date()) {
+    return { success: false, message: "该兑换码已过期" };
+  }
+
+  // 单用户兑换上限：每个用户最多激活 10 个兑换码
+  const redeemCountKey = `redeem_count:${userId}`;
+  const redeemCount = await redis.get<number>(redeemCountKey) || 0;
+  if (redeemCount >= 10) {
+    return { success: false, message: "您的兑换次数已达上限" };
+  }
+
   // 标记兑换码为已使用
   coupon.usedBy = userId;
   coupon.usedAt = new Date().toISOString();
   await redis.set(couponKey, coupon);
+  // 更新用户兑换计数
+  const redeemCountKey2 = `redeem_count:${userId}`;
+  await redis.incr(redeemCountKey2);
 
   // 计算过期时间
   const expiresAt = new Date();
@@ -233,6 +250,12 @@ export async function generateCoupons(
   const config = PLAN_CONFIG[plan];
   const codes: string[] = [];
 
+  // 同一批次共享 batchId 和有效期
+  const batchId = `batch_${Date.now().toString(36)}`;
+  const couponExpiry = new Date();
+  couponExpiry.setDate(couponExpiry.getDate() + 90);
+  const expiresAtStr = couponExpiry.toISOString();
+
   for (let i = 0; i < count; i++) {
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     const part1 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
@@ -245,6 +268,8 @@ export async function generateCoupons(
       imageQuota: config.imageQuota,
       durationDays: config.durationDays,
       createdAt: new Date().toISOString(),
+      expiresAt: expiresAtStr,
+      batchId,
     };
 
     await redis.set(`${COUPON_PREFIX}${code}`, coupon);

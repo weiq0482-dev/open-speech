@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   const nonce = searchParams.get("nonce") || "";
   const echostr = searchParams.get("echostr") || "";
 
-  console.log("[WeCom callback] GET verification:", { msg_signature, timestamp, nonce, echostr: echostr.slice(0, 20) + "..." });
+  // GET verification
 
   const wxCrypt = getWxCrypt();
   const result = wxCrypt.verifyURL(msg_signature, timestamp, nonce, echostr);
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   // 解密消息
   try {
     const { message } = wxCrypt.decrypt(encrypt);
-    console.log("[WeCom callback] Decrypted message XML:", message.slice(0, 200));
+    // message decrypted
 
     // 解析消息内容
     const msgTypeMatch = message.match(/<MsgType><!\[CDATA\[(.*?)\]\]><\/MsgType>/);
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
 
     if (msgTypeMatch && msgTypeMatch[1] === "text" && contentMatch) {
       const content = contentMatch[1];
-      console.log("[WeCom callback] Text message:", content);
+      // text message received
 
       // 路由回复到用户
       // 格式1: "用户ID前8位 回复内容"  → 回复指定用户
