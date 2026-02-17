@@ -382,16 +382,21 @@ export const useChatStore = create<ChatState>()(
       name: "openspeech-chat-storage",
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        conversations: state.conversations.map((c) => ({
+        // 只保留最近 50 个对话，防止 localStorage 无限膨胀
+        conversations: state.conversations.slice(0, 50).map((c) => ({
           ...c,
           messages: c.messages.map((m) => ({
             ...m,
             isStreaming: false,
-            // 保留生成的图片（文本较小），但清理上传附件的 base64 数据以节省空间
+            // 清理上传附件的 base64 数据以节省空间
             attachments: m.attachments?.map((a) => ({
               ...a,
               url: a.url.length > 50000 ? "[已清理-重新上传]" : a.url,
             })),
+            // 清理 AI 生成的图片 base64（每张几百KB，极易撑爆 localStorage）
+            generatedImages: m.generatedImages?.map((img) =>
+              img.length > 100000 ? "[图片已清理-重新生成]" : img
+            ),
           })),
         })),
         activeConversationId: state.activeConversationId,

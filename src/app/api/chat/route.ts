@@ -439,7 +439,15 @@ async function handleStreamingChat(
 // ========== Main Handler ==========
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const rawBody = await req.text();
+    // 请求体大小校验（限制 20MB，防止超大 base64 图片导致 OOM）
+    if (rawBody.length > 20 * 1024 * 1024) {
+      return new Response(
+        JSON.stringify({ error: "请求内容过大，请减少附件数量或大小" }),
+        { status: 413, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    const body = JSON.parse(rawBody);
     const {
       messages,
       tool = "none",
@@ -449,6 +457,14 @@ export async function POST(req: NextRequest) {
       userApiKey,
       userId,
     } = body;
+
+    // 消息数量限制（最多 100 条上下文）
+    if (messages && messages.length > 100) {
+      return new Response(
+        JSON.stringify({ error: "对话历史过长，请开启新对话" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
 
     const isImageGen = tool === "image-gen";
     const usageType = isImageGen ? "image" as const : "chat" as const;

@@ -21,7 +21,7 @@ export function SettingsPanel() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [redeemStatus, setRedeemStatus] = useState<{ type: "success" | "error" | "loading"; msg: string } | null>(null);
-  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; chatRemaining: number; imageRemaining: number; expiresAt: string | null; dailyFreeUsed: number; freeDailyLimit?: number } | null>(null);
+  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; chatRemaining: number; imageRemaining: number; expiresAt: string | null; dailyFreeUsed: number; freeDailyLimit?: number; freeTrialStarted?: string; freeTrialDays?: number } | null>(null);
 
   // 检测是否是兑换码格式
   const isCouponFormat = (v: string) => /^OS-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(v.trim());
@@ -129,9 +129,19 @@ export function SettingsPanel() {
                   <span>生图剩余 <b className="text-[var(--foreground)]">{quotaInfo.imageRemaining}</b> 次</span>
                 </div>
               ) : (
-                <p className="text-[10px] text-[var(--muted)]">
-                  每日免费 {quotaInfo.freeDailyLimit ?? 5} 次 · 已用 {quotaInfo.dailyFreeUsed} 次
-                </p>
+                <>
+                  <p className="text-[10px] text-[var(--muted)]">
+                    每日免费 {quotaInfo.freeDailyLimit ?? 5} 次 · 已用 {quotaInfo.dailyFreeUsed} 次 · 生图消耗2次
+                  </p>
+                  {quotaInfo.freeTrialStarted && quotaInfo.freeTrialDays ? (() => {
+                    const daysLeft = Math.max(0, Math.ceil(quotaInfo.freeTrialDays - (Date.now() - new Date(quotaInfo.freeTrialStarted!).getTime()) / 86400000));
+                    return (
+                      <p className={`text-[10px] ${daysLeft <= 3 ? "text-red-500 font-medium" : "text-[var(--muted)]"}`}>
+                        {daysLeft > 0 ? `试用期剩余 ${daysLeft} 天` : "试用期已结束"}
+                      </p>
+                    );
+                  })() : null}
+                </>
               )}
             </div>
           )}

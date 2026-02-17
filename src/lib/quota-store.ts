@@ -167,12 +167,12 @@ export async function deductQuota(userId: string, type: "chat" | "image"): Promi
     if (type === "chat") quota.chatRemaining = Math.max(0, quota.chatRemaining - 1);
     if (type === "image") quota.imageRemaining = Math.max(0, quota.imageRemaining - 1);
   } else {
-    // 免费用户扣每日额度
+    // 免费用户扣每日额度（生图消耗2次，因API成本更高）
     if (quota.dailyFreeDate !== today) {
       quota.dailyFreeUsed = 0;
       quota.dailyFreeDate = today;
     }
-    quota.dailyFreeUsed += 1;
+    quota.dailyFreeUsed += type === "image" ? 2 : 1;
   }
 
   await redis.set(`${QUOTA_PREFIX}${userId}`, quota);

@@ -50,9 +50,12 @@ export async function addMessage(userId: string, from: "user" | "admin", content
     const threadKey = `${THREAD_PREFIX}${userId}`;
     const existing = await redis.get<UserThread>(threadKey);
     
+    let messages = existing ? [...existing.messages, msg] : [msg];
+    // 每个用户最多保留 200 条消息，防止 Redis 内存膨胀
+    if (messages.length > 200) messages = messages.slice(-200);
     const thread: UserThread = {
       userId,
-      messages: existing ? [...existing.messages, msg] : [msg],
+      messages,
       lastActivity: msg.timestamp,
     };
 

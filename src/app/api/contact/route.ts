@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { addMessage, getMessagesAsync, getAllThreadsAsync, markAdminRead } from "@/lib/message-store";
 import { Redis } from "@upstash/redis";
 
-const ADMIN_KEY = (process.env.ADMIN_KEY || "openspeech-admin-2026").trim();
+const ADMIN_KEY = (process.env.ADMIN_KEY || `random-${Date.now()}-${Math.random()}`).trim();
 
 // 用户消息频率限制
 let _redis: Redis | null = null;
@@ -97,9 +97,7 @@ export async function POST(req: NextRequest) {
     const webhookUrl = process.env.CONTACT_WEBHOOK_URL;
     if (webhookUrl) {
       const timestamp = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
-      const appUrl = (process.env.NEXT_PUBLIC_APP_URL || req.headers.get("origin") || "http://localhost:3000").trim();
-      const replyUrl = `${appUrl}/reply?u=${encodeURIComponent(userId)}&k=${encodeURIComponent(ADMIN_KEY.trim())}`;
-      const text = `📩 用户反馈\n用户ID: ${userId.slice(0, 8)}...\n时间: ${timestamp}\n内容: ${message}\n\n� 点击回复: ${replyUrl}`;
+      const text = `📩 用户反馈\n用户ID: ${userId.slice(0, 8)}...\n时间: ${timestamp}\n内容: ${message}\n\n请在管理后台回复`;
 
       const webhookBody = { msgtype: "text", text: { content: text } };
 
