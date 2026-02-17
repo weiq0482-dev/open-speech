@@ -17,13 +17,30 @@ const redis = new Redis({
 const THREAD_PREFIX = "thread:";
 const ALL_THREADS_KEY = "all_threads";
 
+// 兼容读取：旧数据是 JSON 数组，新数据是 Redis Set
+async function getThreadUserIds() {
+  try {
+    return (await redis.smembers(ALL_THREADS_KEY)) || [];
+  } catch {
+    try {
+      const old = await redis.get(ALL_THREADS_KEY);
+      if (Array.isArray(old) && old.length > 0) {
+        await redis.del(ALL_THREADS_KEY);
+        for (const uid of old) await redis.sadd(ALL_THREADS_KEY, uid);
+        return old;
+      }
+    } catch {}
+    return [];
+  }
+}
+
 // 静态文件
 app.use(express.static(path.join(__dirname, "public")));
 
 // API: 获取所有会话列表
 app.get("/api/threads", async (req, res) => {
   try {
-    const allUserIds = (await redis.get(ALL_THREADS_KEY)) || [];
+    const allUserIds = await getThreadUserIds();
     const threads = [];
 
     for (const userId of allUserIds) {

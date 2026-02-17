@@ -30,6 +30,29 @@ function getRedis(): Redis {
 const THREAD_PREFIX = "thread:";
 const ALL_THREADS_KEY = "all_threads";
 
+// 兼容读取：旧数据是 JSON 数组（string 类型），新数据是 Redis Set
+// 首次读到旧格式时自动迁移
+async function getThreadUserIds(redis: Redis): Promise<string[]> {
+  try {
+    // 先尝试作为 Set 读取
+    return (await redis.smembers(ALL_THREADS_KEY)) as string[];
+  } catch {
+    // 如果失败，可能是旧的 JSON 数组格式
+    try {
+      const old = await redis.get<string[]>(ALL_THREADS_KEY);
+      if (Array.isArray(old) && old.length > 0) {
+        // 迁移：删除旧 key，用 sadd 重建为 Set
+        await redis.del(ALL_THREADS_KEY);
+        for (const uid of old) {
+          await redis.sadd(ALL_THREADS_KEY, uid);
+        }
+        return old;
+      }
+    } catch {}
+    return [];
+  }
+}
+
 // 生成消息 ID
 function generateMessageId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -61,10 +84,13 @@ export async function addMessage(userId: string, from: "user" | "admin", content
 
     await redis.set(threadKey, thread);
     
-    const allThreads = await redis.get<string[]>(ALL_THREADS_KEY) || [];
-    if (!allThreads.includes(userId)) {
-      allThreads.push(userId);
-      await redis.set(ALL_THREADS_KEY, allThreads);
+    // 使用 Redis Set 原子操作，避免并发竞态
+    try {
+      await redis.sadd(ALL_THREADS_KEY, userId);
+    } catch {
+      // 旧格式兼容：如果 sadd 失败，先迁移再重试
+      await getThreadUserIds(redis);
+      await redis.sadd(ALL_THREADS_KEY, userId);
     }
   } catch (err) {
     console.error("[Redis addMessage error]", err);
@@ -99,7 +125,7 @@ export function getAllThreads(): UserThread[] {
 export async function getAllThreadsAsync(): Promise<UserThread[]> {
   try {
     const redis = getRedis();
-    const allUserIds = await redis.get<string[]>(ALL_THREADS_KEY) || [];
+    const allUserIds = await getThreadUserIds(redis);
     const threads: UserThread[] = [];
     
     for (const userId of allUserIds) {

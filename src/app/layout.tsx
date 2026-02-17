@@ -31,6 +31,12 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/icons/icon-192.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+        {/* 阻塞脚本：在页面渲染前恢复暗色模式，消除白闪 */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var d=JSON.parse(localStorage.getItem('openspeech-chat-storage')||'{}');if(d.state&&d.state.darkMode)document.documentElement.classList.add('dark')}catch(e){}`,
+          }}
+        />
       </head>
       <body className="antialiased">
         <DeviceGuard />

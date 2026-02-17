@@ -199,10 +199,10 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
     return { success: false, message: "该兑换码已过期" };
   }
 
-  // 单用户兑换上限：每个用户最多激活 10 个兑换码
+  // 单用户兑换上限：每个用户最多激活 50 个兑换码（防脚本批量刷码）
   const redeemCountKey = `redeem_count:${userId}`;
   const redeemCount = await redis.get<number>(redeemCountKey) || 0;
-  if (redeemCount >= 10) {
+  if (redeemCount >= 50) {
     return { success: false, message: "您的兑换次数已达上限" };
   }
 
@@ -220,11 +220,21 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
 
   // 获取当前配额，叠加（如果有剩余）
   const existing = await getUserQuota(userId);
+
+  // 套餐优先级：quarterly > monthly > trial > free，叠加时不降级
+  const PLAN_RANK: Record<string, number> = { free: 0, trial: 1, monthly: 2, quarterly: 3 };
+  const keepPlan = (PLAN_RANK[existing.plan] || 0) >= (PLAN_RANK[coupon.plan] || 0) && existing.plan !== "free"
+    ? existing.plan : coupon.plan;
+
+  // 过期时间取更晚的那个
+  const existingExpiry = existing.expiresAt ? new Date(existing.expiresAt) : new Date(0);
+  const finalExpiry = existingExpiry > expiresAt ? existingExpiry : expiresAt;
+
   const newQuota: UserQuota = {
-    plan: coupon.plan,
+    plan: keepPlan,
     chatRemaining: (existing.plan !== "free" ? existing.chatRemaining : 0) + coupon.chatQuota,
     imageRemaining: (existing.plan !== "free" ? existing.imageRemaining : 0) + coupon.imageQuota,
-    expiresAt: expiresAt.toISOString(),
+    expiresAt: finalExpiry.toISOString(),
     redeemCode: code.toUpperCase(),
     dailyFreeUsed: existing.dailyFreeUsed,
     dailyFreeDate: existing.dailyFreeDate,

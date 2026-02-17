@@ -131,6 +131,8 @@ function GeneratedImages({
   onEditImage?: (annotatedImageDataUrl: string, instruction: string) => void;
 }) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
+  const [pendingAnnotation, setPendingAnnotation] = useState<string | null>(null);
+  const [editInstruction, setEditInstruction] = useState("");
 
   if (!images || images.length === 0) return null;
 
@@ -169,13 +171,57 @@ function GeneratedImages({
           imageSrc={images[editingIdx]}
           onSave={(annotatedUrl) => {
             setEditingIdx(null);
-            const instruction = window.prompt("描述要修改的内容，如「把标记区域改成蓝色天空」");
-            if (instruction?.trim()) {
-              onEditImage(annotatedUrl, instruction.trim());
-            }
+            setPendingAnnotation(annotatedUrl);
+            setEditInstruction("");
           }}
           onClose={() => setEditingIdx(null)}
         />
+      )}
+
+      {/* 编辑指令输入弹窗（替代 window.prompt，移动端友好） */}
+      {pendingAnnotation && onEditImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => { setPendingAnnotation(null); setEditInstruction(""); }}>
+          <div className="bg-[var(--card)] rounded-2xl shadow-2xl w-full max-w-md p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold">描述修改内容</h3>
+            <p className="text-xs text-[var(--muted)]">已保存标注，请描述你想让 AI 怎么改这张图</p>
+            <input
+              type="text"
+              autoFocus
+              value={editInstruction}
+              onChange={(e) => setEditInstruction(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && editInstruction.trim()) {
+                  onEditImage(pendingAnnotation!, editInstruction.trim());
+                  setPendingAnnotation(null);
+                  setEditInstruction("");
+                }
+              }}
+              placeholder="如：把标记区域改成蓝色天空"
+              className="w-full px-4 py-3 rounded-xl border border-[var(--border)] bg-[var(--background)] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => { setPendingAnnotation(null); setEditInstruction(""); }}
+                className="px-4 py-2 rounded-xl text-sm border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => {
+                  if (editInstruction.trim()) {
+                    onEditImage(pendingAnnotation!, editInstruction.trim());
+                    setPendingAnnotation(null);
+                    setEditInstruction("");
+                  }
+                }}
+                disabled={!editInstruction.trim()}
+                className="px-4 py-2 rounded-xl text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                发送修改
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );
