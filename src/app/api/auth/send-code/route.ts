@@ -60,6 +60,21 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error("[send-code] Resend error:", error);
+      // Resend 额度耗尽或频率限制
+      const errMsg = (error as any)?.message || "";
+      if (errMsg.includes("rate limit") || errMsg.includes("daily") || errMsg.includes("quota")) {
+        return NextResponse.json(
+          { error: "邮件服务繁忙，请稍后重试（建议 1 小时后）" },
+          { status: 503 }
+        );
+      }
+      // 收件人地址无效等
+      if (errMsg.includes("invalid") || errMsg.includes("validation")) {
+        return NextResponse.json(
+          { error: "邮箱地址无效，请检查后重试" },
+          { status: 400 }
+        );
+      }
       return NextResponse.json({ error: "邮件发送失败，请稍后重试" }, { status: 500 });
     }
 
