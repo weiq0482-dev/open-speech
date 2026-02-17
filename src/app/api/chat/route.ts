@@ -33,6 +33,16 @@ async function isRegisteredDevice(userId: string): Promise<boolean> {
   }
 }
 
+async function isUserLocked(userId: string): Promise<string | null> {
+  try {
+    const redis = getDeviceRedis();
+    const reason = await redis.get<string>(`locked:${userId}`);
+    return reason;
+  } catch {
+    return null;
+  }
+}
+
 export const runtime = "edge";
 
 // ========== 模型配置 ==========
@@ -481,6 +491,14 @@ export async function POST(req: NextRequest) {
             { status: 403, headers: { "Content-Type": "application/json" } }
           );
         }
+        // 检查账号是否被锁定
+        const lockReason = await isUserLocked(userId);
+        if (lockReason) {
+          return new Response(
+            JSON.stringify({ error: "您的账号已被暂停使用，请联系客服了解详情", locked: true }),
+            { status: 403, headers: { "Content-Type": "application/json" } }
+          );
+        }
       }
 
       // 获取客户端 IP
@@ -527,10 +545,21 @@ export async function POST(req: NextRequest) {
     // 请求成功后扣减配额（仅平台 Key 用户）
     if (!usingOwnKey && userId && response.ok) {
       const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
-      // 异步扣减 userId + IP 两个维度
+      // 异步扣减 userId + IP 两个维度 + 记录使用日志
+      const redis = getDeviceRedis();
       Promise.all([
         deductQuota(userId, usageType),
         deductByIp(clientIp),
+        // 使用日志（每用户最近 50 条）
+        (async () => {
+          try {
+            const logKey = `usage_log:${userId}`;
+            const logs = (await redis.get<any[]>(logKey)) || [];
+            logs.push({ time: new Date().toISOString(), ip: clientIp, type: usageType, tool });
+            if (logs.length > 50) logs.splice(0, logs.length - 50);
+            await redis.set(logKey, logs);
+          } catch {}
+        })(),
       ]).catch((err) => console.error("[deductQuota error]", err));
     }
 

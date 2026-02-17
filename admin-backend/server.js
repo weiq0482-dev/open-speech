@@ -290,6 +290,146 @@ app.post("/api/upload-qr", async (req, res) => {
   }
 });
 
+// ========== 用户监控与锁定 ==========
+
+// 锁定用户
+app.post("/api/users/lock", async (req, res) => {
+  try {
+    const { userId, reason } = req.body;
+    if (!userId) return res.status(400).json({ error: "缺少 userId" });
+    await redis.set(`locked:${userId}`, reason || "异常使用");
+    console.log(`[用户锁定] ${userId} 原因: ${reason || "异常使用"}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 解锁用户
+app.post("/api/users/unlock", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: "缺少 userId" });
+    await redis.del(`locked:${userId}`);
+    console.log(`[用户解锁] ${userId}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 查询单个用户详情（配额+设备+锁定状态）
+app.get("/api/users/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const quota = await redis.get(`${QUOTA_PREFIX}${userId}`);
+    const locked = await redis.get(`locked:${userId}`);
+    const usageLog = await redis.get(`usage_log:${userId}`) || [];
+    res.json({ userId, quota, locked, usageLog });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 异常监控面板数据：扫描最近注册+高频使用的用户
+app.get("/api/monitor", async (req, res) => {
+  try {
+    // 1. 扫描所有 device_reg: 开头的 key（今日 IP 注册记录）
+    const today = new Date().toISOString().slice(0, 10);
+    // Upstash 不支持 SCAN，用已知的数据做统计
+    // 从所有会话线程中获取活跃用户列表
+    const allThreads = (await redis.get("all_threads")) || [];
+    
+    // 2. 收集用户数据
+    const users = [];
+    // 从 quota 记录收集
+    for (const userId of allThreads) {
+      try {
+        const quota = await redis.get(`${QUOTA_PREFIX}${userId}`);
+        const locked = await redis.get(`locked:${userId}`);
+        if (quota) {
+          users.push({
+            userId,
+            plan: quota.plan || "free",
+            chatRemaining: quota.chatRemaining || 0,
+            imageRemaining: quota.imageRemaining || 0,
+            dailyFreeUsed: quota.dailyFreeUsed || 0,
+            dailyFreeDate: quota.dailyFreeDate || "",
+            freeTrialStarted: quota.freeTrialStarted || "",
+            redeemCode: quota.redeemCode || null,
+            locked: locked || null,
+          });
+        }
+      } catch {}
+    }
+
+    // 3. 也扫描兑换码里绑定的用户
+    const allCoupons = (await redis.get("all_coupons")) || [];
+    const redeemedUsers = new Set(allThreads);
+    for (const code of allCoupons.slice(0, 200)) {
+      try {
+        const coupon = await redis.get(`${COUPON_PREFIX}${code}`);
+        if (coupon && coupon.usedBy && !redeemedUsers.has(coupon.usedBy)) {
+          redeemedUsers.add(coupon.usedBy);
+          const quota = await redis.get(`${QUOTA_PREFIX}${coupon.usedBy}`);
+          const locked = await redis.get(`locked:${coupon.usedBy}`);
+          if (quota) {
+            users.push({
+              userId: coupon.usedBy,
+              plan: quota.plan || "free",
+              chatRemaining: quota.chatRemaining || 0,
+              imageRemaining: quota.imageRemaining || 0,
+              dailyFreeUsed: quota.dailyFreeUsed || 0,
+              dailyFreeDate: quota.dailyFreeDate || "",
+              freeTrialStarted: quota.freeTrialStarted || "",
+              redeemCode: quota.redeemCode || null,
+              locked: locked || null,
+            });
+          }
+        }
+      } catch {}
+    }
+
+    // 4. 异常检测：标记可疑用户
+    const suspicious = users.filter((u) => {
+      // 免费用户当天用量接近或超过限额
+      if (u.plan === "free" && u.dailyFreeUsed >= 4 && u.dailyFreeDate === today) return true;
+      return false;
+    });
+
+    res.json({
+      total: users.length,
+      users: users.sort((a, b) => (b.dailyFreeUsed || 0) - (a.dailyFreeUsed || 0)),
+      suspicious,
+      today,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 记录使用日志（供 chat API 调用，也可前端自行统计）
+app.post("/api/usage-log", async (req, res) => {
+  try {
+    const { userId, ip, type, tool } = req.body;
+    if (!userId) return res.status(400).json({ error: "缺少 userId" });
+    const logKey = `usage_log:${userId}`;
+    const logs = (await redis.get(logKey)) || [];
+    logs.push({
+      time: new Date().toISOString(),
+      ip: ip || "unknown",
+      type: type || "chat",
+      tool: tool || "none",
+    });
+    // 只保留最近 100 条
+    if (logs.length > 100) logs.splice(0, logs.length - 100);
+    await redis.set(logKey, logs);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.ADMIN_PORT || 3088;
 app.listen(PORT, () => {
   console.log(`\n🎧 OpenSpeech 客服管理后台已启动`);

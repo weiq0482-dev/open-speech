@@ -104,6 +104,7 @@
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('chat')">💬 客服</button>
       <button class="tab-btn" onclick="switchTab('coupon')">🎫 兑换码</button>
+      <button class="tab-btn" onclick="switchTab('monitor')">👁 监控</button>
       <button class="tab-btn" onclick="switchTab('settings')">⚙️ 设置</button>
     </div>
     <!-- 客服标签内容 -->
@@ -141,6 +142,48 @@
         </div>
         <div id="couponList" style="max-height:calc(100vh - 420px);overflow-y:auto;">
           <div style="text-align:center;color:#999;font-size:13px;padding:20px;">点击「刷新」加载</div>
+        </div>
+      </div>
+    </div>
+    <!-- 用户监控标签内容 -->
+    <div id="tabMonitor" class="hidden" style="overflow-y:auto;max-height:calc(100vh - 100px);">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="font-size:14px;font-weight:600;">👁 用户监控</h3>
+          <button onclick="loadMonitor()" style="padding:4px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:11px;cursor:pointer;background:#fff;">刷新</button>
+        </div>
+        <div id="monitorStats" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <div style="flex:1;min-width:80px;padding:10px;background:#eff6ff;border-radius:8px;text-align:center;">
+            <div style="font-size:20px;font-weight:700;color:#3b82f6;" id="statTotal">-</div>
+            <div style="font-size:10px;color:#666;">总用户</div>
+          </div>
+          <div style="flex:1;min-width:80px;padding:10px;background:#fef3c7;border-radius:8px;text-align:center;">
+            <div style="font-size:20px;font-weight:700;color:#d97706;" id="statSuspicious">-</div>
+            <div style="font-size:10px;color:#666;">可疑</div>
+          </div>
+          <div style="flex:1;min-width:80px;padding:10px;background:#fee2e2;border-radius:8px;text-align:center;">
+            <div style="font-size:20px;font-weight:700;color:#dc2626;" id="statLocked">-</div>
+            <div style="font-size:10px;color:#666;">已锁定</div>
+          </div>
+        </div>
+        <!-- 手动锁定区 -->
+        <div style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;">🔒 手动锁定用户</div>
+          <div style="display:flex;gap:6px;">
+            <input id="lockUserId" placeholder="输入 userId" style="flex:1;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+            <button onclick="lockUser()" style="padding:6px 12px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">锁定</button>
+          </div>
+          <div id="lockResult" style="margin-top:6px;"></div>
+        </div>
+        <!-- 可疑用户列表 -->
+        <div style="font-size:12px;font-weight:600;color:#d97706;">⚠️ 可疑用户（今日高频使用）</div>
+        <div id="suspiciousList" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="text-align:center;color:#999;font-size:12px;padding:12px;">点击「刷新」加载</div>
+        </div>
+        <!-- 全部用户列表 -->
+        <div style="font-size:12px;font-weight:600;margin-top:4px;">📋 全部用户</div>
+        <div id="userList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;">
+          <div style="text-align:center;color:#999;font-size:12px;padding:12px;">点击「刷新」加载</div>
         </div>
       </div>
     </div>
@@ -602,12 +645,14 @@
 
       document.getElementById('tabChat').classList.toggle('hidden', tab !== 'chat');
       document.getElementById('tabCoupon').classList.toggle('hidden', tab !== 'coupon');
+      document.getElementById('tabMonitor').classList.toggle('hidden', tab !== 'monitor');
       document.getElementById('tabSettings').classList.toggle('hidden', tab !== 'settings');
       document.getElementById('mainChat').classList.toggle('hidden', tab !== 'chat');
       document.getElementById('mainCoupon').classList.toggle('hidden', tab !== 'coupon');
 
       if (tab === 'coupon') fetchCoupons();
       if (tab === 'settings') loadSettings();
+      if (tab === 'monitor') loadMonitor();
     }
 
     // === 系统设置 ===
@@ -693,6 +738,107 @@
         }
       };
       reader.readAsDataURL(file);
+    }
+
+    // === 用户监控 ===
+    async function loadMonitor() {
+      try {
+        const resp = await fetch('/api/monitor');
+        const data = await resp.json();
+        const { total, users, suspicious } = data;
+        const lockedCount = users.filter(u => u.locked).length;
+
+        document.getElementById('statTotal').textContent = total;
+        document.getElementById('statSuspicious').textContent = suspicious.length;
+        document.getElementById('statLocked').textContent = lockedCount;
+
+        // 渲染可疑用户
+        const suspDiv = document.getElementById('suspiciousList');
+        if (suspicious.length === 0) {
+          suspDiv.innerHTML = '<div style="text-align:center;color:#16a34a;font-size:12px;padding:8px;">✅ 暂无可疑用户</div>';
+        } else {
+          suspDiv.innerHTML = suspicious.map(u => renderUserCard(u, true)).join('');
+        }
+
+        // 渲染全部用户
+        const listDiv = document.getElementById('userList');
+        if (users.length === 0) {
+          listDiv.innerHTML = '<div style="text-align:center;color:#999;font-size:12px;padding:12px;">暂无用户数据</div>';
+        } else {
+          listDiv.innerHTML = users.map(u => renderUserCard(u, false)).join('');
+        }
+      } catch (err) {
+        console.error('加载监控数据失败:', err);
+      }
+    }
+
+    function renderUserCard(u, isSuspicious) {
+      const shortId = u.userId.length > 20 ? u.userId.slice(0, 20) + '...' : u.userId;
+      const planLabel = { free: '免费', trial: '体验卡', monthly: '月卡', quarterly: '季卡' }[u.plan] || u.plan;
+      const planColor = { free: '#999', trial: '#2563eb', monthly: '#d97706', quarterly: '#7c3aed' }[u.plan] || '#999';
+      const borderColor = u.locked ? '#fecaca' : isSuspicious ? '#fef3c7' : '#e5e7eb';
+      const bgColor = u.locked ? '#fef2f2' : '#fff';
+
+      let statusHtml = '';
+      if (u.locked) {
+        statusHtml = `<span style="color:#dc2626;font-size:10px;font-weight:600;">🔒 已锁定: ${escapeHtml(u.locked)}</span>`;
+      }
+
+      const actionBtn = u.locked
+        ? `<button onclick="unlockUser('${u.userId}')" style="padding:3px 8px;border:1px solid #22c55e;border-radius:4px;font-size:10px;cursor:pointer;background:#f0fdf4;color:#16a34a;">解锁</button>`
+        : `<button onclick="lockUser('${u.userId}')" style="padding:3px 8px;border:1px solid #fca5a5;border-radius:4px;font-size:10px;cursor:pointer;background:#fef2f2;color:#dc2626;">锁定</button>`;
+
+      return `<div style="padding:8px 10px;border:1px solid ${borderColor};border-radius:8px;background:${bgColor};font-size:11px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
+          <span style="font-family:monospace;font-weight:600;color:#333;" title="${u.userId}">${shortId}</span>
+          <span style="color:${planColor};font-weight:600;font-size:10px;">${planLabel}</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
+          <span style="color:#666;">今日: <b>${u.dailyFreeUsed || 0}</b>次</span>
+          ${u.plan !== 'free' ? `<span style="color:#666;">剩余对话: <b>${u.chatRemaining}</b></span><span style="color:#666;">剩余生图: <b>${u.imageRemaining}</b></span>` : ''}
+          ${u.redeemCode ? `<span style="color:#999;">码: ${u.redeemCode}</span>` : ''}
+          ${statusHtml}
+          ${actionBtn}
+        </div>
+      </div>`;
+    }
+
+    async function lockUser(userId) {
+      if (!userId) {
+        userId = document.getElementById('lockUserId').value.trim();
+      }
+      if (!userId) return alert('请输入 userId');
+      const reason = prompt('锁定原因（可选）:', '异常使用') || '异常使用';
+      try {
+        const resp = await fetch('/api/users/lock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, reason }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          const resultDiv = document.getElementById('lockResult');
+          if (resultDiv) resultDiv.innerHTML = '<span style="color:#dc2626;font-size:11px;">🔒 已锁定</span>';
+          loadMonitor();
+        }
+      } catch (err) {
+        alert('锁定失败: ' + err.message);
+      }
+    }
+
+    async function unlockUser(userId) {
+      if (!confirm(`确认解锁 ${userId.slice(0, 16)}... ?`)) return;
+      try {
+        const resp = await fetch('/api/users/unlock', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId }),
+        });
+        const data = await resp.json();
+        if (data.success) loadMonitor();
+      } catch (err) {
+        alert('解锁失败: ' + err.message);
+      }
     }
 
     async function saveSettings() {
