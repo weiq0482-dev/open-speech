@@ -1,5 +1,37 @@
 import { NextRequest } from "next/server";
 import { canUse, deductQuota, canUseByIp, deductByIp } from "@/lib/quota-store";
+import { Redis } from "@upstash/redis";
+
+// 验证 userId 是否为已注册设备
+let _deviceRedis: Redis | null = null;
+function getDeviceRedis(): Redis {
+  if (!_deviceRedis) {
+    _deviceRedis = new Redis({
+      url: (process.env.KV_REST_API_URL || "").trim(),
+      token: (process.env.KV_REST_API_TOKEN || "").trim(),
+    });
+  }
+  return _deviceRedis;
+}
+
+async function isRegisteredDevice(userId: string): Promise<boolean> {
+  try {
+    const redis = getDeviceRedis();
+    // 方式1：检查注册标记（新用户通过 /api/device 注册时写入）
+    const marker = await redis.get<string>(`registered:${userId}`);
+    if (marker === "1") return true;
+    // 方式2：兼容老用户——检查是否已有 quota 记录（只有真实用过的才有）
+    const quota = await redis.get(`quota:${userId}`);
+    if (quota) {
+      // 补写标记，下次就不需要二次查询了
+      await redis.set(`registered:${userId}`, "1");
+      return true;
+    }
+    return false;
+  } catch {
+    return true; // Redis 异常时放行，避免阻断所有用户
+  }
+}
 
 export const runtime = "edge";
 
@@ -438,6 +470,17 @@ export async function POST(req: NextRequest) {
           JSON.stringify({ error: "请先配置 API Key 或兑换体验卡", details: "请在「设置」中填入 API Key 或兑换码" }),
           { status: 401, headers: { "Content-Type": "application/json" } }
         );
+      }
+
+      // 验证 userId 是否为真实注册的设备（防伪造 userId 绕过配额）
+      if (userId) {
+        const registered = await isRegisteredDevice(userId);
+        if (!registered) {
+          return new Response(
+            JSON.stringify({ error: "设备未注册，请刷新页面重试" }),
+            { status: 403, headers: { "Content-Type": "application/json" } }
+          );
+        }
       }
 
       // 获取客户端 IP
