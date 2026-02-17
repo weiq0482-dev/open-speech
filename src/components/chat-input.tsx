@@ -46,7 +46,7 @@ const IMAGE_ACTIONS = [
   { label: "📝 解答题目", prompt: "请仔细阅读图片中的题目，给出详细的解答过程和答案" },
   { label: "🌐 翻译", prompt: "请识别图片中的所有文字，并翻译成中文（如果已经是中文则翻译成英文）" },
   { label: "✨ 变清晰", prompt: "请分析这张图片，帮我用AI生成一张更清晰、更高分辨率的版本" },
-  { label: "� 去水印", prompt: "请帮我去除这张图片上的水印，生成一张干净的版本" },
+  { label: "🧹 去水印", prompt: "请帮我去除这张图片上的水印，生成一张干净的版本" },
 ];
 
 interface ChatInputProps {

@@ -235,10 +235,17 @@ export default function Home() {
         });
 
         if (!response.ok) {
-          updateMessage(convId!, assistantMsgId, { content: "" });
+          let errorMsg = "请求失败，请稍后再试";
+          let isQuotaIssue = false;
+          try {
+            const errData = await response.json();
+            errorMsg = errData.error || errorMsg;
+            isQuotaIssue = !!errData.quotaExhausted;
+          } catch {}
+          updateMessage(convId!, assistantMsgId, { content: isQuotaIssue ? "" : `⚠️ ${errorMsg}` });
           setMessageStreaming(convId!, assistantMsgId, false);
           setIsGenerating(false);
-          setShowPromo(true);
+          if (isQuotaIssue) setShowPromo(true);
           return;
         }
 
@@ -446,7 +453,7 @@ export default function Home() {
         setIsGenerating(false);
       }
     },
-    [activeConv, isGenerating, addMessage, updateMessage, setMessageStreaming, setIsGenerating]
+    [activeConv, isGenerating, addMessage, updateMessage, setMessageStreaming, setIsGenerating, userApiKey, userId]
   );
 
   // 图片标记编辑：将标注后的图片 + 修改指令发送给 image-gen
@@ -517,7 +524,7 @@ export default function Home() {
         scrollToBottom();
       }
     },
-    [activeConv, isGenerating, addMessage, updateMessage, setMessageStreaming, setIsGenerating, scrollToBottom]
+    [activeConv, isGenerating, addMessage, updateMessage, setMessageStreaming, setIsGenerating, scrollToBottom, userApiKey, userId]
   );
 
   return (
@@ -674,15 +681,15 @@ export default function Home() {
           >
             <p className="text-sm text-red-500 dark:text-red-400 mb-3">额度不足</p>
             <p className="text-xs text-[var(--muted)] mb-4">
-              免费用户每日 5 次对话，兑换体验卡或填入 API Key 可解锁更多次数
+              免费额度已用完，兑换体验卡或填入 API Key 可解锁更多次数
             </p>
             <img
-              src="/douyin-qr.png"
+              src={siteConfig?.douyinQrUrl || "/douyin-qr.png"}
               alt="抖音二维码"
               className="w-52 h-auto mx-auto rounded-xl mb-3"
               onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
-            <p className="text-base font-semibold mb-1">抖音号：arch8288</p>
+            <p className="text-base font-semibold mb-1">抖音号：{siteConfig?.douyinAccount || "arch8288"}</p>
             <p className="text-sm text-[var(--muted)] mb-4">
               关注获取兑换码 · 小黄车购买体验卡
             </p>

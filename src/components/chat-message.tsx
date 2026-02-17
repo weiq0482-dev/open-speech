@@ -360,8 +360,12 @@ export const ChatMessage = memo(function ChatMessage({
               </button>
             )}
             <button
+              onClick={() => {
+                const text = message.content + (message.generatedImages?.length ? "\n[包含AI生成图片]" : "");
+                navigator.clipboard.writeText(text);
+              }}
               className="p-1.5 rounded-lg text-[var(--muted)] hover:bg-[var(--sidebar-hover)] transition-colors"
-              title="分享"
+              title="复制全文"
             >
               <Share2 size={14} />
             </button>

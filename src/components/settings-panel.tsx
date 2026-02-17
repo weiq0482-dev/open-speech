@@ -21,7 +21,7 @@ export function SettingsPanel() {
   const [confirmClear, setConfirmClear] = useState(false);
   const [inputValue, setInputValue] = useState("");
   const [redeemStatus, setRedeemStatus] = useState<{ type: "success" | "error" | "loading"; msg: string } | null>(null);
-  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; chatRemaining: number; imageRemaining: number; expiresAt: string | null; dailyFreeUsed: number } | null>(null);
+  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; chatRemaining: number; imageRemaining: number; expiresAt: string | null; dailyFreeUsed: number; freeDailyLimit?: number } | null>(null);
 
   // 检测是否是兑换码格式
   const isCouponFormat = (v: string) => /^OS-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(v.trim());
@@ -130,7 +130,7 @@ export function SettingsPanel() {
                 </div>
               ) : (
                 <p className="text-[10px] text-[var(--muted)]">
-                  每日免费 5 次 · 已用 {quotaInfo.dailyFreeUsed} 次
+                  每日免费 {quotaInfo.freeDailyLimit ?? 5} 次 · 已用 {quotaInfo.dailyFreeUsed} 次
                 </p>
               )}
             </div>

@@ -453,13 +453,8 @@ export async function POST(req: NextRequest) {
     const isImageGen = tool === "image-gen";
     const usageType = isImageGen ? "image" as const : "chat" as const;
 
-    // userId 格式校验（必须是 device API 生成的格式）
-    if (userId && !/^u_[a-f0-9]{12}_[a-z0-9]+$/.test(userId)) {
-      return new Response(
-        JSON.stringify({ error: "无效的用户标识" }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    // userId 格式校验：不匹配设备 API 格式时，当作匿名用户（仅走 IP 限制）
+    const validUserId = userId && /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(userId) ? userId : null;
 
     // API 地址仅从服务端配置读取
     const apiBase = process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com";
@@ -483,8 +478,8 @@ export async function POST(req: NextRequest) {
       }
 
       // 验证 userId 是否为真实注册的设备（防伪造 userId 绕过配额）
-      if (userId) {
-        const registered = await isRegisteredDevice(userId);
+      if (validUserId) {
+        const registered = await isRegisteredDevice(validUserId);
         if (!registered) {
           return new Response(
             JSON.stringify({ error: "设备未注册，请刷新页面重试" }),
@@ -492,7 +487,7 @@ export async function POST(req: NextRequest) {
           );
         }
         // 检查账号是否被锁定
-        const lockReason = await isUserLocked(userId);
+        const lockReason = await isUserLocked(validUserId);
         if (lockReason) {
           return new Response(
             JSON.stringify({ error: "您的账号已被暂停使用，请联系客服了解详情", locked: true }),
@@ -507,8 +502,8 @@ export async function POST(req: NextRequest) {
       let isPaidUser = false;
 
       // 检查用户配额（userId 级别）
-      if (userId) {
-        const check = await canUse(userId, usageType);
+      if (validUserId) {
+        const check = await canUse(validUserId, usageType);
         if (!check.allowed) {
           return new Response(
             JSON.stringify({ error: check.reason || "额度不足", quotaExhausted: true }),
@@ -543,17 +538,17 @@ export async function POST(req: NextRequest) {
     }
 
     // 请求成功后扣减配额（仅平台 Key 用户）
-    if (!usingOwnKey && userId && response.ok) {
+    if (!usingOwnKey && validUserId && response.ok) {
       const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
       // 异步扣减 userId + IP 两个维度 + 记录使用日志
       const redis = getDeviceRedis();
       Promise.all([
-        deductQuota(userId, usageType),
+        deductQuota(validUserId, usageType),
         deductByIp(clientIp),
         // 使用日志（每用户最近 50 条）
         (async () => {
           try {
-            const logKey = `usage_log:${userId}`;
+            const logKey = `usage_log:${validUserId}`;
             const logs = (await redis.get<any[]>(logKey)) || [];
             logs.push({ time: new Date().toISOString(), ip: clientIp, type: usageType, tool });
             if (logs.length > 50) logs.splice(0, logs.length - 50);

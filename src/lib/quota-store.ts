@@ -44,6 +44,10 @@ interface SystemSettings {
   freeDailyLimit: number;
 }
 
+export async function getSystemSettingsPublic(): Promise<SystemSettings> {
+  return getSystemSettings();
+}
+
 async function getSystemSettings(): Promise<SystemSettings> {
   try {
     const redis = getRedis();
