@@ -62,7 +62,9 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
   const [imageResolution, setImageResolution] = useState<"standard" | "2k" | "4k">("standard");
   const [editingImage, setEditingImage] = useState<{ id: string; url: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const recognitionRef = useRef<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
   const toolsBtnRef = useRef<HTMLButtonElement>(null);
@@ -485,8 +487,45 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
           <div className="flex items-center gap-1">
             {/* Voice input */}
             <button
-              className="p-2 rounded-full hover:bg-[var(--sidebar-hover)] transition-colors text-[var(--muted)]"
-              title="语音输入"
+              onClick={() => {
+                if (isRecording) {
+                  recognitionRef.current?.stop();
+                  setIsRecording(false);
+                  return;
+                }
+                const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                if (!SR) { alert("当前浏览器不支持语音输入，请使用 Chrome 浏览器"); return; }
+                const recognition = new SR();
+                recognition.lang = "zh-CN";
+                recognition.interimResults = true;
+                recognition.continuous = true;
+                let finalText = input;
+                recognition.onresult = (event: any) => {
+                  let interim = "";
+                  for (let i = event.resultIndex; i < event.results.length; i++) {
+                    const transcript = event.results[i][0].transcript;
+                    if (event.results[i].isFinal) {
+                      finalText += transcript;
+                      setInput(finalText);
+                    } else {
+                      interim += transcript;
+                    }
+                  }
+                  if (interim) setInput(finalText + interim);
+                };
+                recognition.onerror = () => setIsRecording(false);
+                recognition.onend = () => setIsRecording(false);
+                recognitionRef.current = recognition;
+                recognition.start();
+                setIsRecording(true);
+              }}
+              className={cn(
+                "p-2 rounded-full transition-colors",
+                isRecording
+                  ? "bg-red-500 text-white animate-pulse"
+                  : "hover:bg-[var(--sidebar-hover)] text-[var(--muted)]"
+              )}
+              title={isRecording ? "停止录音" : "语音输入"}
             >
               <Mic size={20} />
             </button>
