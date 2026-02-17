@@ -89,7 +89,7 @@ export function SettingsPanel() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 h-14 shrink-0 border-b border-[var(--border)]">
         <div className="flex items-center gap-2">
-          <Sliders size={18} className="text-gemini-blue" />
+          <Sliders size={18} className="text-blue-500" />
           <span className="font-semibold text-sm">设置</span>
         </div>
         <button

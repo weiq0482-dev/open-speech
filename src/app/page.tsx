@@ -43,7 +43,7 @@ function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => v
       style={{ height: "420px" }}>
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[var(--border)] shrink-0">
         <div className="flex items-center gap-2">
-          <Headphones size={16} className="text-gemini-blue" />
+          <Headphones size={16} className="text-blue-500" />
           <span className="text-sm font-semibold">客服消息</span>
         </div>
         <button onClick={onClose} className="p-1 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)]">
@@ -57,7 +57,7 @@ function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => v
             <div className={`max-w-[75%] px-3 py-1.5 rounded-xl text-xs ${
               msg.from === "admin"
                 ? "bg-[var(--sidebar-hover)] text-[var(--foreground)]"
-                : "bg-gemini-blue text-white"
+                : "bg-blue-500 text-white"
             }`}>
               <p className="whitespace-pre-wrap">{msg.content}</p>
               <p className={`text-[9px] mt-0.5 ${msg.from === "admin" ? "text-[var(--muted)]" : "text-blue-100"}`}>
@@ -75,13 +75,13 @@ function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => v
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             placeholder="输入消息..."
-            className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-gemini-blue"
+            className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500"
           />
           <button
             onClick={handleSend}
             disabled={!input.trim() || sending}
             className={`p-1.5 rounded-lg text-white transition-colors ${
-              input.trim() && !sending ? "bg-gemini-blue" : "bg-gray-300"
+              input.trim() && !sending ? "bg-blue-500" : "bg-gray-300"
             }`}
           >
             <Send size={14} />
@@ -534,7 +534,7 @@ export default function Home() {
             </>
           )}
           <div className="flex items-center gap-2">
-            <Sparkles size={20} className="text-gemini-blue" />
+            <Sparkles size={20} className="text-blue-500" />
             <span className="font-semibold text-lg">OpenSpeech</span>
           </div>
         </header>
@@ -547,7 +547,7 @@ export default function Home() {
               <div className="max-w-2xl w-full text-center space-y-6">
                 <div className="space-y-2">
                   <h1 className="text-3xl sm:text-4xl font-semibold">
-                    <span className="gemini-gradient">你好</span>
+                    <span className="app-gradient">你好</span>
                   </h1>
                   <h2 className="text-xl sm:text-2xl font-medium text-[var(--foreground)]">
                     需要我为你做些什么？
@@ -557,7 +557,7 @@ export default function Home() {
                 {/* Welcome banner */}
                 <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-left max-w-xl mx-auto">
                   <p className="text-sm font-medium mb-1">
-                    欢迎使用 <span className="gemini-gradient font-semibold">OpenSpeech</span>，你的 AI 助手
+                    欢迎使用 <span className="app-gradient font-semibold">OpenSpeech</span>，你的 AI 助手
                   </p>
                   <p className="text-xs text-[var(--muted)] mb-3">
                     支持多轮对话、文件上传、代码高亮、深度研究等功能。
@@ -626,7 +626,7 @@ export default function Home() {
               <span className="text-[10px] text-[var(--muted)] ml-auto">{notifyMsg.time}</span>
             </div>
             <p className="text-sm line-clamp-3">{notifyMsg.content}</p>
-            <p className="text-[10px] text-gemini-blue mt-2">点击查看对话 →</p>
+            <p className="text-[10px] text-blue-500 mt-2">点击查看对话 →</p>
           </div>
         </div>
       )}
@@ -651,6 +651,7 @@ export default function Home() {
               src="/douyin-qr.png"
               alt="抖音二维码"
               className="w-52 h-auto mx-auto rounded-xl mb-3"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
             />
             <p className="text-base font-semibold mb-1">抖音号：arch8288</p>
             <p className="text-sm text-[var(--muted)] mb-4">

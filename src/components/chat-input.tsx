@@ -274,13 +274,13 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
         className={cn(
           "rounded-2xl border bg-[var(--card)] shadow-sm overflow-hidden transition-colors",
           isDragging
-            ? "border-gemini-blue border-2 bg-blue-50/50 dark:bg-blue-900/10"
+            ? "border-blue-500 border-2 bg-blue-50/50 dark:bg-blue-900/10"
             : "border-[var(--border)]"
         )}
       >
         {/* Drag overlay hint */}
         {isDragging && (
-          <div className="flex items-center justify-center py-4 text-sm text-gemini-blue font-medium">
+          <div className="flex items-center justify-center py-4 text-sm text-blue-500 font-medium">
             <ImageIcon size={18} className="mr-2" />
             松开即可添加文件
           </div>
@@ -300,7 +300,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
         {!activeGem && (
           <div className="flex items-center gap-1 px-3 pt-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[var(--muted)]">
-              <Sparkles size={14} className="text-gemini-blue" />
+              <Sparkles size={14} className="text-blue-500" />
               <span>OpenSpeech</span>
               {activeTool !== "none" && (
                 <span className="text-xs text-blue-500 ml-1">
@@ -465,7 +465,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
                 className={cn(
                   "p-2 rounded-full transition-colors",
                   input.trim() || attachments.length > 0
-                    ? "bg-gemini-blue text-white hover:bg-blue-600"
+                    ? "bg-blue-500 text-white hover:bg-blue-600"
                     : "text-[var(--muted)] cursor-not-allowed"
                 )}
                 title="发送"

@@ -275,7 +275,7 @@ export function ImageEditor({ imageSrc, onSubmit, onClose }: ImageEditorProps) {
             className={cn(
               "p-2.5 rounded-xl transition-colors",
               instruction.trim() && history.length > 1
-                ? "bg-gemini-blue text-white hover:bg-blue-600"
+                ? "bg-blue-500 text-white hover:bg-blue-600"
                 : "bg-[var(--sidebar-hover)] text-[var(--muted)] cursor-not-allowed"
             )}
           >

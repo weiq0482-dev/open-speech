@@ -52,7 +52,7 @@ function buildHeaders(apiKey: string): Record<string, string> {
   };
 }
 
-// ========== Helper: 构建 Gemini contents 数组 ==========
+// ========== Helper: 构建 API contents 数组 ==========
 function buildContents(messages: any[]) {
   return messages.map((msg) => {
     const parts: any[] = [];
@@ -243,7 +243,7 @@ async function handleStreamingChat(
     : (userConfig?.thinkingBudget ?? 4096);
   generationConfig.thinkingConfig = { thinkingBudget };
 
-  const geminiBody: any = {
+  const requestBody: any = {
     contents,
     systemInstruction: { parts: [{ text: systemInstruction }] },
     generationConfig,
@@ -252,7 +252,7 @@ async function handleStreamingChat(
 
   // Deep Research: 添加 Google Search grounding
   if (tool === "deep-research") {
-    geminiBody.tools = [{ google_search: {} }];
+    requestBody.tools = [{ google_search: {} }];
   }
 
   // 使用流式端点
@@ -261,7 +261,7 @@ async function handleStreamingChat(
   const response = await fetch(apiUrl, {
     method: "POST",
     headers: buildHeaders(apiKey),
-    body: JSON.stringify(geminiBody),
+    body: JSON.stringify(requestBody),
   });
 
   if (!response.ok) {
@@ -412,7 +412,7 @@ export async function POST(req: NextRequest) {
     const usageType = isImageGen ? "image" as const : "chat" as const;
 
     // API 地址仅从服务端配置读取
-    const apiBase = process.env.GEMINI_API_BASE || "https://4sapi.com";
+    const apiBase = process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com";
 
     let apiKey = "";
     let usingOwnKey = false;
@@ -423,7 +423,7 @@ export async function POST(req: NextRequest) {
       usingOwnKey = true;
     } else {
       // 使用平台 Key，需要检查配额
-      apiKey = process.env.GEMINI_API_KEY || "";
+      apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "";
 
       if (!apiKey) {
         return new Response(

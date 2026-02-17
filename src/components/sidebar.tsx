@@ -128,7 +128,7 @@ function ContactChatDialog({
                   "max-w-[75%] px-3 py-2 rounded-2xl text-sm",
                   msg.from === "admin"
                     ? "bg-[var(--sidebar-hover)] text-[var(--foreground)]"
-                    : "bg-gemini-blue text-white"
+                    : "bg-blue-500 text-white"
                 )}
               >
                 <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -152,7 +152,7 @@ function ContactChatDialog({
               onChange={(e) => setContactMsg(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
               placeholder="输入消息..."
-              className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-gemini-blue"
+              className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-500"
             />
             <button
               onClick={handleSend}
@@ -160,7 +160,7 @@ function ContactChatDialog({
               className={cn(
                 "p-2.5 rounded-xl text-white transition-colors",
                 contactMsg.trim() && !contactSending
-                  ? "bg-gemini-blue hover:bg-blue-600"
+                  ? "bg-blue-500 hover:bg-blue-600"
                   : "bg-gray-300 cursor-not-allowed"
               )}
             >
@@ -406,7 +406,7 @@ export function Sidebar() {
               {/* New Gem button */}
               <button
                 onClick={() => setShowNewGem(true)}
-                className="flex items-center gap-2 w-full px-3 py-2 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm text-gemini-blue"
+                className="flex items-center gap-2 w-full px-3 py-2 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm text-blue-500"
               >
                 <Plus size={16} />
                 <span>找专家</span>
@@ -481,7 +481,7 @@ export function Sidebar() {
                     className={cn(
                       "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors",
                       isActive
-                        ? "bg-gemini-blue/10 text-gemini-blue font-medium"
+                        ? "bg-blue-500/10 text-blue-500 font-medium"
                         : "text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
                     )}
                   >
@@ -594,7 +594,7 @@ export function Sidebar() {
                   type="text"
                   value={newGemName}
                   onChange={(e) => setNewGemName(e.target.value)}
-                  className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-gemini-blue"
+                  className="flex-1 px-3 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-500"
                   placeholder="专家名称"
                 />
               </div>
@@ -602,13 +602,13 @@ export function Sidebar() {
                 type="text"
                 value={newGemDesc}
                 onChange={(e) => setNewGemDesc(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-gemini-blue"
+                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-500"
                 placeholder="简短描述（可选）"
               />
               <textarea
                 value={newGemPrompt}
                 onChange={(e) => setNewGemPrompt(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-gemini-blue resize-none"
+                className="w-full px-3 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-500 resize-none"
                 rows={5}
                 placeholder="系统指令：告诉 AI 它应该如何表现、擅长什么、回答风格等..."
               />
@@ -626,7 +626,7 @@ export function Sidebar() {
                 className={cn(
                   "px-4 py-2 rounded-xl text-sm text-white transition-colors",
                   newGemName.trim() && newGemPrompt.trim()
-                    ? "bg-gemini-blue hover:bg-blue-600"
+                    ? "bg-blue-500 hover:bg-blue-600"
                     : "bg-gray-300 cursor-not-allowed"
                 )}
               >

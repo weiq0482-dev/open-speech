@@ -206,6 +206,7 @@ interface ChatState {
   // API 配置 actions
   setUserApiKey: (key: string) => void;
   setUserApiBase: (base: string) => void;
+  setUserId: (id: string) => void;
   clearAllConversations: () => void;
 }
 
@@ -373,6 +374,7 @@ export const useChatStore = create<ChatState>()(
     set({ generationConfig: { ...DEFAULT_CONFIG }, customSystemInstruction: "" }),
   setUserApiKey: (key) => set({ userApiKey: key }),
   setUserApiBase: (base) => set({ userApiBase: base }),
+  setUserId: (id) => set({ userId: id }),
   clearAllConversations: () =>
     set({ conversations: [], activeConversationId: null }),
 }),

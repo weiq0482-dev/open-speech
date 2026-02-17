@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { DeviceGuard } from "@/components/device-guard";
 
 export const metadata: Metadata = {
   title: "OpenSpeech - AI 助手",
@@ -32,6 +33,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
       </head>
       <body className="antialiased">
+        <DeviceGuard />
         {children}
         <script
           dangerouslySetInnerHTML={{

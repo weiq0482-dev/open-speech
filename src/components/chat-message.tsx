@@ -36,9 +36,9 @@ interface ChatMessageProps {
 function TypingIndicator() {
   return (
     <div className="flex items-center gap-1.5 py-2">
-      <div className="typing-dot w-2 h-2 rounded-full bg-gemini-blue" />
-      <div className="typing-dot w-2 h-2 rounded-full bg-gemini-blue" />
-      <div className="typing-dot w-2 h-2 rounded-full bg-gemini-blue" />
+      <div className="typing-dot w-2 h-2 rounded-full bg-blue-500" />
+      <div className="typing-dot w-2 h-2 rounded-full bg-blue-500" />
+      <div className="typing-dot w-2 h-2 rounded-full bg-blue-500" />
     </div>
   );
 }
@@ -275,7 +275,7 @@ export const ChatMessage = memo(function ChatMessage({
         <div
           className={cn(
             "rounded-2xl px-4 py-3",
-            isUser ? "bg-gemini-blue text-white ml-auto" : "bg-transparent"
+            isUser ? "bg-blue-500 text-white ml-auto" : "bg-transparent"
           )}
         >
           {message.isStreaming && !message.content && !message.thinkingContent ? (
@@ -321,7 +321,7 @@ export const ChatMessage = memo(function ChatMessage({
               className={cn(
                 "p-1.5 rounded-lg transition-colors",
                 liked === "up"
-                  ? "text-gemini-blue bg-blue-50 dark:bg-blue-900/20"
+                  ? "text-blue-500 bg-blue-50 dark:bg-blue-900/20"
                   : "text-[var(--muted)] hover:bg-[var(--sidebar-hover)]"
               )}
               title="有用"
