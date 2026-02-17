@@ -1,7 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addMessage, getMessagesAsync, getAllThreadsAsync, markAdminRead } from "@/lib/message-store";
+import { Redis } from "@upstash/redis";
 
 const ADMIN_KEY = (process.env.ADMIN_KEY || "openspeech-admin-2026").trim();
+
+// 用户消息频率限制
+let _redis: Redis | null = null;
+function getRedis(): Redis {
+  if (!_redis) {
+    _redis = new Redis({
+      url: (process.env.KV_REST_API_URL || "").trim(),
+      token: (process.env.KV_REST_API_TOKEN || "").trim(),
+    });
+  }
+  return _redis;
+}
+
+const MSG_RATE_LIMIT = 20; // 每小时最多 20 条
+const MSG_RATE_WINDOW = 3600;
+
+async function checkMsgRate(userId: string): Promise<boolean> {
+  const redis = getRedis();
+  const key = `rate:msg:${userId}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, MSG_RATE_WINDOW);
+  return count <= MSG_RATE_LIMIT;
+}
 
 // GET: 获取消息
 // ?userId=xxx      → 获取该用户的对话记录
@@ -59,6 +83,12 @@ export async function POST(req: NextRequest) {
     // 用户发送消息
     if (!userId) {
       return NextResponse.json({ error: "缺少用户ID" }, { status: 400 });
+    }
+
+    // 频率限制
+    const allowed = await checkMsgRate(userId);
+    if (!allowed) {
+      return NextResponse.json({ error: "发送过于频繁，请稍后再试" }, { status: 429 });
     }
 
     const msg = await addMessage(userId, "user", message.trim());

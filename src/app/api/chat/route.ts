@@ -411,6 +411,14 @@ export async function POST(req: NextRequest) {
     const isImageGen = tool === "image-gen";
     const usageType = isImageGen ? "image" as const : "chat" as const;
 
+    // userId 格式校验（必须是 device API 生成的格式）
+    if (userId && !/^u_[a-f0-9]{12}_[a-z0-9]+$/.test(userId)) {
+      return new Response(
+        JSON.stringify({ error: "无效的用户标识" }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
     // API 地址仅从服务端配置读取
     const apiBase = process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com";
 

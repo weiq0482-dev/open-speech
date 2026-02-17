@@ -78,7 +78,7 @@ export async function getUserQuota(userId: string): Promise<UserQuota> {
   if (existing) {
     // 检查是否过期
     if (existing.expiresAt && new Date(existing.expiresAt) < new Date()) {
-      // 套餐过期，降级为免费
+      // 套餐过期，降级为免费（保留试用期记录，防止重新获得试用期）
       const freeQuota: UserQuota = {
         plan: "free",
         chatRemaining: 0,
@@ -87,6 +87,7 @@ export async function getUserQuota(userId: string): Promise<UserQuota> {
         redeemCode: null,
         dailyFreeUsed: existing.dailyFreeUsed,
         dailyFreeDate: existing.dailyFreeDate,
+        freeTrialStarted: existing.freeTrialStarted,
       };
       await redis.set(`${QUOTA_PREFIX}${userId}`, freeQuota);
       return freeQuota;
@@ -206,6 +207,7 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
     redeemCode: code.toUpperCase(),
     dailyFreeUsed: existing.dailyFreeUsed,
     dailyFreeDate: existing.dailyFreeDate,
+    freeTrialStarted: existing.freeTrialStarted,
   };
 
   await redis.set(`${QUOTA_PREFIX}${userId}`, newQuota);
@@ -248,15 +250,16 @@ export async function generateCoupons(
   return codes;
 }
 
-// ========== IP 级别每日额度（防绕过） ==========
+// ========== IP 级别每日额度（防绕过，读取动态设置） ==========
 const IP_DAILY_PREFIX = "ip_daily:";
 
 export async function canUseByIp(ip: string): Promise<boolean> {
   const redis = getRedis();
+  const settings = await getSystemSettings();
   const today = new Date().toISOString().slice(0, 10);
   const key = `${IP_DAILY_PREFIX}${ip}:${today}`;
   const used = await redis.get<number>(key);
-  return (used || 0) < FREE_DAILY_LIMIT;
+  return (used || 0) < settings.freeDailyLimit;
 }
 
 export async function deductByIp(ip: string): Promise<void> {

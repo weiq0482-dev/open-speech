@@ -35,6 +35,8 @@ function ContactChatDialog({
   contactSending,
   onSend,
   onClose,
+  contactQrUrl,
+  contactWechatId,
 }: {
   userId: string;
   contactMsg: string;
@@ -42,6 +44,8 @@ function ContactChatDialog({
   contactSending: boolean;
   onSend: () => void;
   onClose: () => void;
+  contactQrUrl?: string;
+  contactWechatId?: string;
 }) {
   const [messages, setMessages] = useState<ContactMsg[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -98,7 +102,7 @@ function ContactChatDialog({
           <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 mb-3">
             <div className="flex items-center gap-4">
               <img
-                src="/wechat-qr.png"
+                src={contactQrUrl || "/wechat-qr.png"}
                 alt="客服微信二维码"
                 className="flex-shrink-0 w-24 h-24 rounded-lg object-contain"
               />
@@ -107,7 +111,7 @@ function ContactChatDialog({
                   客服微信
                 </p>
                 <p className="text-sm text-blue-700 dark:text-blue-300 mb-1">
-                  微信号：jryg8686
+                  微信号：{contactWechatId || "jryg8686"}
                 </p>
                 <p className="text-xs text-blue-600 dark:text-blue-400">
                   扫码或搜索微信号添加客服
@@ -207,6 +211,11 @@ export function Sidebar() {
   const [sidebarKeyInput, setSidebarKeyInput] = useState("");
   const [sidebarKeyMsg, setSidebarKeyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [showNewGem, setShowNewGem] = useState(false);
+  const [siteConfig, setSiteConfig] = useState<{ contactQrUrl?: string; contactWechatId?: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/site-config").then(r => r.json()).then(d => setSiteConfig(d.config)).catch(() => {});
+  }, []);
   const [newGemName, setNewGemName] = useState("");
   const [newGemIcon, setNewGemIcon] = useState("🤖");
   const [newGemDesc, setNewGemDesc] = useState("");
@@ -646,6 +655,8 @@ export function Sidebar() {
           contactSending={contactSending}
           onSend={handleSendContact}
           onClose={() => setShowContact(false)}
+          contactQrUrl={siteConfig?.contactQrUrl}
+          contactWechatId={siteConfig?.contactWechatId}
         />
       )}
     </>

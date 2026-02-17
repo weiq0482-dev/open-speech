@@ -237,6 +237,59 @@ app.get("/api/coupons/:code", async (req, res) => {
   }
 });
 
+// ========== 站点配置（二维码、联系方式等） ==========
+const SITE_CONFIG_KEY = "site_config";
+const DEFAULT_SITE_CONFIG = {
+  douyinQrUrl: "/douyin-qr.png",
+  douyinAccount: "arch8288",
+  douyinDesc: "免费体验卡 · 教程 · 功能更新",
+  wechatQrUrl: "/wechat-qr.png",
+  wechatGroupName: "Open-speech 超级梦想家",
+  wechatDesc: "微信扫码 · 把想法变成现实",
+  contactWechatId: "jryg8686",
+  contactQrUrl: "/wechat-qr.png",
+};
+
+app.get("/api/site-config", async (req, res) => {
+  try {
+    const config = (await redis.get(SITE_CONFIG_KEY)) || {};
+    res.json({ config: { ...DEFAULT_SITE_CONFIG, ...config } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/site-config", async (req, res) => {
+  try {
+    const existing = (await redis.get(SITE_CONFIG_KEY)) || {};
+    const updated = { ...existing, ...req.body };
+    await redis.set(SITE_CONFIG_KEY, updated);
+    console.log("[站点配置] 更新:", Object.keys(req.body).join(", "));
+    res.json({ success: true, config: { ...DEFAULT_SITE_CONFIG, ...updated } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 图片上传（base64）用于二维码更换
+app.post("/api/upload-qr", async (req, res) => {
+  try {
+    const { field, base64Data } = req.body;
+    if (!field || !base64Data) return res.status(400).json({ error: "缺少参数" });
+    const allowedFields = ["douyinQrUrl", "wechatQrUrl", "contactQrUrl"];
+    if (!allowedFields.includes(field)) return res.status(400).json({ error: "无效字段" });
+
+    // 存入 Redis（base64 直接作为 data URL）
+    const existing = (await redis.get(SITE_CONFIG_KEY)) || {};
+    existing[field] = base64Data;
+    await redis.set(SITE_CONFIG_KEY, existing);
+    console.log(`[站点配置] 更新二维码图片: ${field}`);
+    res.json({ success: true, url: base64Data });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const PORT = process.env.ADMIN_PORT || 3088;
 app.listen(PORT, () => {
   console.log(`\n🎧 OpenSpeech 客服管理后台已启动`);

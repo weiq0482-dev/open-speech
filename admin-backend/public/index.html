@@ -145,7 +145,7 @@
       </div>
     </div>
     <!-- 设置标签内容 -->
-    <div id="tabSettings" class="hidden">
+    <div id="tabSettings" class="hidden" style="overflow-y:auto;max-height:calc(100vh - 100px);">
       <div style="padding:16px;display:flex;flex-direction:column;gap:16px;">
         <h3 style="font-size:14px;font-weight:600;">免费试用设置</h3>
         <div>
@@ -164,11 +164,95 @@
         </div>
         <button onclick="saveSettings()" style="padding:10px 20px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;width:fit-content;">保存设置</button>
         <div id="settingsResult"></div>
-        <div style="margin-top:8px;padding:12px;background:#f9fafb;border-radius:8px;font-size:11px;color:#999;line-height:1.8;">
+      </div>
+
+      <!-- 站点配置：二维码、联系方式 -->
+      <div style="padding:0 16px 16px;border-top:1px solid #e5e7eb;margin-top:4px;padding-top:16px;">
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:12px;">📱 首页二维码配置</h3>
+
+        <!-- 抖音配置 -->
+        <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:12px;">
+          <p style="font-size:12px;font-weight:600;margin-bottom:8px;">抖音二维码</p>
+          <div style="display:flex;gap:12px;align-items:start;">
+            <div style="text-align:center;">
+              <img id="previewDouyinQr" src="/douyin-qr.png" style="width:80px;height:80px;border-radius:8px;border:1px solid #e0e3e8;object-fit:contain;background:#fff;" />
+              <div style="margin-top:4px;">
+                <label style="font-size:10px;color:#3b82f6;cursor:pointer;text-decoration:underline;">
+                  更换图片
+                  <input type="file" accept="image/*" style="display:none;" onchange="uploadQrImage('douyinQrUrl', this, 'previewDouyinQr')" />
+                </label>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+              <div>
+                <label style="font-size:11px;color:#666;">抖音号</label>
+                <input id="scDouyinAccount" type="text" style="width:100%;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+              </div>
+              <div>
+                <label style="font-size:11px;color:#666;">描述文字</label>
+                <input id="scDouyinDesc" type="text" style="width:100%;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 微信群配置 -->
+        <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:12px;">
+          <p style="font-size:12px;font-weight:600;margin-bottom:8px;">微信群二维码</p>
+          <div style="display:flex;gap:12px;align-items:start;">
+            <div style="text-align:center;">
+              <img id="previewWechatQr" src="/wechat-qr.png" style="width:80px;height:80px;border-radius:8px;border:1px solid #e0e3e8;object-fit:contain;background:#fff;" />
+              <div style="margin-top:4px;">
+                <label style="font-size:10px;color:#3b82f6;cursor:pointer;text-decoration:underline;">
+                  更换图片
+                  <input type="file" accept="image/*" style="display:none;" onchange="uploadQrImage('wechatQrUrl', this, 'previewWechatQr')" />
+                </label>
+              </div>
+            </div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px;">
+              <div>
+                <label style="font-size:11px;color:#666;">群名称</label>
+                <input id="scWechatGroupName" type="text" style="width:100%;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+              </div>
+              <div>
+                <label style="font-size:11px;color:#666;">描述文字</label>
+                <input id="scWechatDesc" type="text" style="width:100%;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 客服微信配置 -->
+        <div style="background:#f9fafb;border-radius:10px;padding:12px;margin-bottom:12px;">
+          <p style="font-size:12px;font-weight:600;margin-bottom:8px;">客服微信</p>
+          <div style="display:flex;gap:12px;align-items:start;">
+            <div style="text-align:center;">
+              <img id="previewContactQr" src="/wechat-qr.png" style="width:80px;height:80px;border-radius:8px;border:1px solid #e0e3e8;object-fit:contain;background:#fff;" />
+              <div style="margin-top:4px;">
+                <label style="font-size:10px;color:#3b82f6;cursor:pointer;text-decoration:underline;">
+                  更换图片
+                  <input type="file" accept="image/*" style="display:none;" onchange="uploadQrImage('contactQrUrl', this, 'previewContactQr')" />
+                </label>
+              </div>
+            </div>
+            <div style="flex:1;">
+              <label style="font-size:11px;color:#666;">客服微信号</label>
+              <input id="scContactWechatId" type="text" style="width:100%;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+            </div>
+          </div>
+        </div>
+
+        <button onclick="saveSiteConfig()" style="padding:10px 20px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;width:fit-content;">保存站点配置</button>
+        <div id="siteConfigResult"></div>
+      </div>
+
+      <div style="padding:0 16px 16px;">
+        <div style="padding:12px;background:#f9fafb;border-radius:8px;font-size:11px;color:#999;line-height:1.8;">
           <strong>说明：</strong><br/>
           · 试用期天数：用户首次使用后可免费使用的天数，到期后需兑换或购买<br/>
-          · 每日免费次数：试用期内每天可免费对话的次数<br/>
-          · 修改后立即对所有免费用户生效
+          · 每日免费次数：试用期内每天可免费对话的次数（同时限制 IP 级别）<br/>
+          · 二维码更换：点击「更换图片」选择新图片，保存后前端即时生效<br/>
+          · 修改后立即对所有用户生效
         </div>
       </div>
     </div>
@@ -537,6 +621,78 @@
       } catch (err) {
         console.error('加载设置失败:', err);
       }
+      // 同时加载站点配置
+      loadSiteConfig();
+    }
+
+    // === 站点配置 ===
+    async function loadSiteConfig() {
+      try {
+        const resp = await fetch('/api/site-config');
+        const data = await resp.json();
+        const c = data.config;
+        document.getElementById('scDouyinAccount').value = c.douyinAccount || '';
+        document.getElementById('scDouyinDesc').value = c.douyinDesc || '';
+        document.getElementById('scWechatGroupName').value = c.wechatGroupName || '';
+        document.getElementById('scWechatDesc').value = c.wechatDesc || '';
+        document.getElementById('scContactWechatId').value = c.contactWechatId || '';
+        if (c.douyinQrUrl) document.getElementById('previewDouyinQr').src = c.douyinQrUrl;
+        if (c.wechatQrUrl) document.getElementById('previewWechatQr').src = c.wechatQrUrl;
+        if (c.contactQrUrl) document.getElementById('previewContactQr').src = c.contactQrUrl;
+      } catch (err) {
+        console.error('加载站点配置失败:', err);
+      }
+    }
+
+    async function saveSiteConfig() {
+      const resultDiv = document.getElementById('siteConfigResult');
+      const config = {
+        douyinAccount: document.getElementById('scDouyinAccount').value.trim(),
+        douyinDesc: document.getElementById('scDouyinDesc').value.trim(),
+        wechatGroupName: document.getElementById('scWechatGroupName').value.trim(),
+        wechatDesc: document.getElementById('scWechatDesc').value.trim(),
+        contactWechatId: document.getElementById('scContactWechatId').value.trim(),
+      };
+      try {
+        const resp = await fetch('/api/site-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          resultDiv.innerHTML = '<span style="color:#16a34a;font-size:12px;">✅ 站点配置已保存</span>';
+          setTimeout(() => { resultDiv.innerHTML = ''; }, 3000);
+        } else {
+          resultDiv.innerHTML = '<span style="color:#dc2626;font-size:12px;">❌ ' + data.error + '</span>';
+        }
+      } catch (err) {
+        resultDiv.innerHTML = '<span style="color:#dc2626;font-size:12px;">❌ ' + err.message + '</span>';
+      }
+    }
+
+    async function uploadQrImage(field, inputEl, previewId) {
+      const file = inputEl.files[0];
+      if (!file) return;
+      if (file.size > 500 * 1024) {
+        alert('图片太大，最大支持 500KB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const base64Data = e.target.result;
+        document.getElementById(previewId).src = base64Data;
+        try {
+          await fetch('/api/upload-qr', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ field, base64Data }),
+          });
+        } catch (err) {
+          alert('上传失败: ' + err.message);
+        }
+      };
+      reader.readAsDataURL(file);
     }
 
     async function saveSettings() {

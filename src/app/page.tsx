@@ -115,6 +115,17 @@ export default function Home() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeConv = getActiveConversation();
 
+  // 站点配置（二维码等，从后台动态读取）
+  const [siteConfig, setSiteConfig] = useState<{
+    douyinQrUrl: string; douyinAccount: string; douyinDesc: string;
+    wechatQrUrl: string; wechatGroupName: string; wechatDesc: string;
+    contactWechatId: string; contactQrUrl: string;
+  } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/site-config").then(r => r.json()).then(d => setSiteConfig(d.config)).catch(() => {});
+  }, []);
+
   // 客服消息通知
   const [notifyMsg, setNotifyMsg] = useState<{ content: string; time: string } | null>(null);
   const [showContactChat, setShowContactChat] = useState(false);
@@ -578,22 +589,22 @@ export default function Home() {
                   </div>
                 </div>
 
-                {/* 二维码并排区域 */}
+                {/* 二维码并排区域（从管理后台动态配置） */}
                 <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4">
                   {/* 抖音 */}
                   <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] flex flex-col items-center text-center gap-3">
-                    <img src="/douyin-qr.png" alt="抖音" className="w-32 h-32 rounded-xl" />
+                    <img src={siteConfig?.douyinQrUrl || "/douyin-qr.png"} alt="抖音" className="w-32 h-32 rounded-xl" />
                     <div>
-                      <p className="text-sm font-semibold">关注抖音号 arch8288</p>
-                      <p className="text-[11px] text-[var(--muted)] mt-1">免费体验卡 · 教程 · 功能更新</p>
+                      <p className="text-sm font-semibold">关注抖音号 {siteConfig?.douyinAccount || "arch8288"}</p>
+                      <p className="text-[11px] text-[var(--muted)] mt-1">{siteConfig?.douyinDesc || "免费体验卡 · 教程 · 功能更新"}</p>
                     </div>
                   </div>
                   {/* 微信群 */}
                   <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] flex flex-col items-center text-center gap-3">
-                    <img src="/wechat-qr.png" alt="微信群" className="w-32 h-32 rounded-xl" />
+                    <img src={siteConfig?.wechatQrUrl || "/wechat-qr.png"} alt="微信群" className="w-32 h-32 rounded-xl" />
                     <div>
-                      <p className="text-sm font-semibold">加入「Open-speech 超级梦想家」群</p>
-                      <p className="text-[11px] text-[var(--muted)] mt-1">微信扫码 · 把想法变成现实</p>
+                      <p className="text-sm font-semibold">加入「{siteConfig?.wechatGroupName || "Open-speech 超级梦想家"}」群</p>
+                      <p className="text-[11px] text-[var(--muted)] mt-1">{siteConfig?.wechatDesc || "微信扫码 · 把想法变成现实"}</p>
                     </div>
                   </div>
                 </div>
