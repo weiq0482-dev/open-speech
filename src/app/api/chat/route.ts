@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { canUse, deductQuota } from "@/lib/quota-store";
+import { canUse, deductQuota, canUseByIp, deductByIp } from "@/lib/quota-store";
 
 export const runtime = "edge";
 
@@ -432,12 +432,29 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 检查用户配额
+      // 获取客户端 IP
+      const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+
+      let isPaidUser = false;
+
+      // 检查用户配额（userId 级别）
       if (userId) {
         const check = await canUse(userId, usageType);
         if (!check.allowed) {
           return new Response(
             JSON.stringify({ error: check.reason || "额度不足", quotaExhausted: true }),
+            { status: 429, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        isPaidUser = check.quota.plan !== "free";
+      }
+
+      // 免费用户始终检查 IP 级别额度（防止换 userId 绕过）
+      if (!isPaidUser) {
+        const ipAllowed = await canUseByIp(clientIp);
+        if (!ipAllowed) {
+          return new Response(
+            JSON.stringify({ error: "今日免费额度已用完", quotaExhausted: true }),
             { status: 429, headers: { "Content-Type": "application/json" } }
           );
         }
@@ -458,10 +475,12 @@ export async function POST(req: NextRequest) {
 
     // 请求成功后扣减配额（仅平台 Key 用户）
     if (!usingOwnKey && userId && response.ok) {
-      // 异步扣减，不阻塞响应
-      deductQuota(userId, usageType).catch((err) =>
-        console.error("[deductQuota error]", err)
-      );
+      const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
+      // 异步扣减 userId + IP 两个维度
+      Promise.all([
+        deductQuota(userId, usageType),
+        deductByIp(clientIp),
+      ]).catch((err) => console.error("[deductQuota error]", err));
     }
 
     return response;

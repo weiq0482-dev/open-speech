@@ -128,10 +128,11 @@ app.post("/api/mark-read", async (req, res) => {
 
 // ========== 兑换码管理 ==========
 const COUPON_PREFIX = "coupon:";
+const ALL_COUPONS_KEY = "all_coupons";
 const PLAN_CONFIG = {
-  trial:     { chatQuota: 50,   imageQuota: 10,  durationDays: 7 },
-  monthly:   { chatQuota: 500,  imageQuota: 50,  durationDays: 30 },
-  quarterly: { chatQuota: 2000, imageQuota: 200, durationDays: 90 },
+  trial:     { chatQuota: 50,   imageQuota: 10,  durationDays: 7,  label: "体验卡(7天)" },
+  monthly:   { chatQuota: 500,  imageQuota: 50,  durationDays: 30, label: "月卡(30天)" },
+  quarterly: { chatQuota: 2000, imageQuota: 200, durationDays: 90, label: "季卡(90天)" },
 };
 
 // API: 生成兑换码
@@ -160,6 +161,11 @@ app.post("/api/coupons/generate", async (req, res) => {
       codes.push(code);
     }
 
+    // 追踪所有已生成的兑换码
+    const existing = (await redis.get(ALL_COUPONS_KEY)) || [];
+    existing.push(...codes);
+    await redis.set(ALL_COUPONS_KEY, existing);
+
     console.log(`[兑换码] 生成 ${num} 个 ${plan} 兑换码`);
     res.json({ success: true, codes, plan });
   } catch (err) {
@@ -168,13 +174,39 @@ app.post("/api/coupons/generate", async (req, res) => {
   }
 });
 
-// API: 查询兑换码列表
+// API: 查询所有兑换码及状态
 app.get("/api/coupons", async (req, res) => {
   try {
-    const { plan } = req.query;
-    // 扫描所有 coupon: 前缀的 key（简单实现，适合小规模）
-    // 注意：生产环境应用 SCAN，这里用列表追踪
-    res.json({ message: "请使用 /api/coupons/generate 生成兑换码" });
+    const allCodes = (await redis.get(ALL_COUPONS_KEY)) || [];
+    const coupons = [];
+    for (const code of allCodes) {
+      const data = await redis.get(`${COUPON_PREFIX}${code}`);
+      if (data) {
+        coupons.push({
+          code,
+          plan: data.plan,
+          planLabel: PLAN_CONFIG[data.plan]?.label || data.plan,
+          createdAt: data.createdAt,
+          usedBy: data.usedBy || null,
+          usedAt: data.usedAt || null,
+        });
+      }
+    }
+    // 最新的排在前面
+    coupons.reverse();
+    res.json({ coupons });
+  } catch (err) {
+    console.error("[GET /api/coupons]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// API: 查询单个兑换码
+app.get("/api/coupons/:code", async (req, res) => {
+  try {
+    const data = await redis.get(`${COUPON_PREFIX}${req.params.code}`);
+    if (!data) return res.status(404).json({ error: "兑换码不存在" });
+    res.json({ code: req.params.code, ...data });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

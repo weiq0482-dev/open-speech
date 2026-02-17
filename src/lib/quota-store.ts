@@ -20,6 +20,8 @@ export interface UserQuota {
   // 免费用户每日额度
   dailyFreeUsed: number;
   dailyFreeDate: string;
+  // 免费试用期开始时间（首次使用时记录）
+  freeTrialStarted?: string;
 }
 
 // ========== 套餐配置 ==========
@@ -30,6 +32,7 @@ export const PLAN_CONFIG = {
 };
 
 export const FREE_DAILY_LIMIT = 5;
+export const FREE_TRIAL_DAYS = 30;
 
 // ========== Redis Key ==========
 const COUPON_PREFIX = "coupon:";
@@ -72,7 +75,7 @@ export async function getUserQuota(userId: string): Promise<UserQuota> {
     return existing;
   }
 
-  // 新用户，返回免费配额
+  // 新用户，返回免费配额，记录免费试用期开始时间
   const today = new Date().toISOString().slice(0, 10);
   const newQuota: UserQuota = {
     plan: "free",
@@ -82,6 +85,7 @@ export async function getUserQuota(userId: string): Promise<UserQuota> {
     redeemCode: null,
     dailyFreeUsed: 0,
     dailyFreeDate: today,
+    freeTrialStarted: new Date().toISOString(),
   };
   await redis.set(`${QUOTA_PREFIX}${userId}`, newQuota);
   return newQuota;
@@ -97,6 +101,19 @@ export async function canUse(userId: string, type: "chat" | "image"): Promise<{ 
     if (type === "chat" && quota.chatRemaining > 0) return { allowed: true, quota };
     if (type === "image" && quota.imageRemaining > 0) return { allowed: true, quota };
     return { allowed: false, reason: "套餐额度已用完，请续费", quota };
+  }
+
+  // 检查免费试用期是否过期
+  if (quota.freeTrialStarted) {
+    const trialStart = new Date(quota.freeTrialStarted);
+    const now = new Date();
+    const daysSinceStart = (now.getTime() - trialStart.getTime()) / (1000 * 86400);
+    if (daysSinceStart > FREE_TRIAL_DAYS) {
+      return { allowed: false, reason: `免费试用期已结束（${FREE_TRIAL_DAYS}天），请兑换体验卡或购买套餐`, quota };
+    }
+  } else {
+    // 老用户没有 freeTrialStarted 字段，补记录
+    quota.freeTrialStarted = new Date().toISOString();
   }
 
   // 免费用户检查每日额度
@@ -207,6 +224,25 @@ export async function generateCoupons(
   }
 
   return codes;
+}
+
+// ========== IP 级别每日额度（防绕过） ==========
+const IP_DAILY_PREFIX = "ip_daily:";
+
+export async function canUseByIp(ip: string): Promise<boolean> {
+  const redis = getRedis();
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `${IP_DAILY_PREFIX}${ip}:${today}`;
+  const used = await redis.get<number>(key);
+  return (used || 0) < FREE_DAILY_LIMIT;
+}
+
+export async function deductByIp(ip: string): Promise<void> {
+  const redis = getRedis();
+  const today = new Date().toISOString().slice(0, 10);
+  const key = `${IP_DAILY_PREFIX}${ip}:${today}`;
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, 86400);
 }
 
 // ========== 兑换码格式检测 ==========

@@ -579,11 +579,11 @@ export default function Home() {
                 </div>
 
                 {/* 抖音引导 */}
-                <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] max-w-xl mx-auto flex items-center gap-4">
-                  <img src="/douyin-qr.png" alt="抖音" className="w-16 h-16 rounded-lg shrink-0" />
+                <div className="bg-[var(--card)] rounded-2xl p-5 border border-[var(--border)] max-w-xl mx-auto flex items-center gap-5">
+                  <img src="/douyin-qr.png" alt="抖音" className="w-28 h-28 rounded-xl shrink-0" />
                   <div className="text-left flex-1">
-                    <p className="text-xs font-medium">关注抖音号 arch8288</p>
-                    <p className="text-[10px] text-[var(--muted)] mt-0.5">获取免费体验卡 · 教程 · 最新功能更新</p>
+                    <p className="text-sm font-semibold">关注抖音号 arch8288</p>
+                    <p className="text-xs text-[var(--muted)] mt-1">获取免费体验卡 · 教程 · 最新功能更新</p>
                   </div>
                 </div>
               </div>

@@ -125,11 +125,15 @@ body {
 
 /* Brand gradient text */
 .app-gradient {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4);
+  background: linear-gradient(135deg, #4285f4, #ea4335, #fbbc04, #34a853);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Hide scrollbar */
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }
 
 /* Typing indicator */
 @keyframes blink {

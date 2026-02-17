@@ -39,6 +39,17 @@ const SUGGESTIONS = [
   "给我的一天计划",
 ];
 
+const IMAGE_ACTIONS = [
+  { label: "🔍 找相似图", prompt: "帮我找与这张图片相似的图片，描述图片的关键特征和风格" },
+  { label: "🎬 生成视频", prompt: "根据这张图片的内容，帮我写一段视频脚本，描述如何将这个画面做成一个短视频" },
+  { label: "✨ 变清晰", prompt: "请分析这张图片，帮我用AI生成一张更清晰、更高分辨率的版本" },
+  { label: "💧 去水印", prompt: "请帮我去除这张图片上的水印，生成一张干净的版本" },
+  { label: "❓ 这是什么", prompt: "请详细描述这张图片中的内容，这是什么？包括物体、场景、文字等所有信息" },
+  { label: "📝 解答题目", prompt: "请仔细阅读图片中的题目，给出详细的解答过程和答案" },
+  { label: "🌐 翻译", prompt: "请识别图片中的所有文字，并翻译成中文（如果已经是中文则翻译成英文）" },
+  { label: "📋 提取文字", prompt: "请识别并提取图片中的所有文字内容，保持原始格式" },
+];
+
 interface ChatInputProps {
   onSend: (content: string, attachments?: Attachment[]) => void;
   disabled?: boolean;
@@ -262,6 +273,26 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
       {attachments.filter((a) => a.type === "image").length > 1 && (
         <div className="text-[10px] text-[var(--muted)] mb-1 px-1">
           💡 可用编号引用图片，如「参考图1的风格 + 图2的构图」
+        </div>
+      )}
+
+      {/* Image quick actions - show when image attached */}
+      {attachments.some((a) => a.type === "image") && (
+        <div className="flex gap-1.5 mb-2 overflow-x-auto pb-1 scrollbar-hide">
+          {IMAGE_ACTIONS.map((action) => (
+            <button
+              key={action.label}
+              onClick={() => {
+                onSend(action.prompt, attachments);
+                setAttachments([]);
+                setInput("");
+              }}
+              disabled={disabled || isGenerating}
+              className="shrink-0 px-3 py-1.5 rounded-full border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--sidebar-hover)] transition-colors text-xs whitespace-nowrap"
+            >
+              {action.label}
+            </button>
+          ))}
         </div>
       )}
 
