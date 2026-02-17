@@ -104,6 +104,7 @@
     <div class="tab-bar">
       <button class="tab-btn active" onclick="switchTab('chat')">💬 客服</button>
       <button class="tab-btn" onclick="switchTab('coupon')">🎫 兑换码</button>
+      <button class="tab-btn" onclick="switchTab('settings')">⚙️ 设置</button>
     </div>
     <!-- 客服标签内容 -->
     <div id="tabChat">
@@ -140,6 +141,34 @@
         </div>
         <div id="couponList" style="max-height:calc(100vh - 420px);overflow-y:auto;">
           <div style="text-align:center;color:#999;font-size:13px;padding:20px;">点击「刷新」加载</div>
+        </div>
+      </div>
+    </div>
+    <!-- 设置标签内容 -->
+    <div id="tabSettings" class="hidden">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+        <h3 style="font-size:14px;font-weight:600;">免费试用设置</h3>
+        <div>
+          <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">试用期天数</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="settingTrialDays" type="number" value="30" min="1" max="365" style="padding:8px 12px;border:1px solid #e0e3e8;border-radius:8px;font-size:13px;outline:none;width:80px;" />
+            <span style="font-size:12px;color:#999;">天（首次使用起算）</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">每日免费次数</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="settingDailyLimit" type="number" value="5" min="1" max="100" style="padding:8px 12px;border:1px solid #e0e3e8;border-radius:8px;font-size:13px;outline:none;width:80px;" />
+            <span style="font-size:12px;color:#999;">次/天</span>
+          </div>
+        </div>
+        <button onclick="saveSettings()" style="padding:10px 20px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;width:fit-content;">保存设置</button>
+        <div id="settingsResult"></div>
+        <div style="margin-top:8px;padding:12px;background:#f9fafb;border-radius:8px;font-size:11px;color:#999;line-height:1.8;">
+          <strong>说明：</strong><br/>
+          · 试用期天数：用户首次使用后可免费使用的天数，到期后需兑换或购买<br/>
+          · 每日免费次数：试用期内每天可免费对话的次数<br/>
+          · 修改后立即对所有免费用户生效
         </div>
       </div>
     </div>
@@ -489,10 +518,48 @@
 
       document.getElementById('tabChat').classList.toggle('hidden', tab !== 'chat');
       document.getElementById('tabCoupon').classList.toggle('hidden', tab !== 'coupon');
+      document.getElementById('tabSettings').classList.toggle('hidden', tab !== 'settings');
       document.getElementById('mainChat').classList.toggle('hidden', tab !== 'chat');
       document.getElementById('mainCoupon').classList.toggle('hidden', tab !== 'coupon');
 
       if (tab === 'coupon') fetchCoupons();
+      if (tab === 'settings') loadSettings();
+    }
+
+    // === 系统设置 ===
+    async function loadSettings() {
+      try {
+        const resp = await fetch('/api/settings');
+        const data = await resp.json();
+        const s = data.settings;
+        document.getElementById('settingTrialDays').value = s.freeTrialDays || 30;
+        document.getElementById('settingDailyLimit').value = s.freeDailyLimit || 5;
+      } catch (err) {
+        console.error('加载设置失败:', err);
+      }
+    }
+
+    async function saveSettings() {
+      const resultDiv = document.getElementById('settingsResult');
+      const freeTrialDays = parseInt(document.getElementById('settingTrialDays').value) || 30;
+      const freeDailyLimit = parseInt(document.getElementById('settingDailyLimit').value) || 5;
+
+      try {
+        const resp = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ freeTrialDays, freeDailyLimit }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          resultDiv.innerHTML = '<span style="color:#16a34a;font-size:12px;">✅ 设置已保存</span>';
+          setTimeout(() => { resultDiv.innerHTML = ''; }, 3000);
+        } else {
+          resultDiv.innerHTML = `<span style="color:#dc2626;font-size:12px;">❌ ${data.error}</span>`;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = `<span style="color:#dc2626;font-size:12px;">❌ ${err.message}</span>`;
+      }
     }
 
     // === 兑换码管理 ===

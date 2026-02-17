@@ -126,6 +126,31 @@ app.post("/api/mark-read", async (req, res) => {
   }
 });
 
+// ========== 系统设置 ==========
+const SETTINGS_KEY = "system_settings";
+const DEFAULT_SETTINGS = { freeTrialDays: 30, freeDailyLimit: 5 };
+
+app.get("/api/settings", async (req, res) => {
+  try {
+    const settings = (await redis.get(SETTINGS_KEY)) || DEFAULT_SETTINGS;
+    res.json({ settings: { ...DEFAULT_SETTINGS, ...settings } });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/settings", async (req, res) => {
+  try {
+    const existing = (await redis.get(SETTINGS_KEY)) || DEFAULT_SETTINGS;
+    const updated = { ...existing, ...req.body };
+    await redis.set(SETTINGS_KEY, updated);
+    console.log("[设置] 更新系统设置:", updated);
+    res.json({ success: true, settings: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ========== 兑换码管理 ==========
 const COUPON_PREFIX = "coupon:";
 const ALL_COUPONS_KEY = "all_coupons";

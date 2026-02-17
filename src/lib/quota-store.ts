@@ -37,6 +37,25 @@ export const FREE_TRIAL_DAYS = 30;
 // ========== Redis Key ==========
 const COUPON_PREFIX = "coupon:";
 const QUOTA_PREFIX = "quota:";
+const SETTINGS_KEY = "system_settings";
+
+interface SystemSettings {
+  freeTrialDays: number;
+  freeDailyLimit: number;
+}
+
+async function getSystemSettings(): Promise<SystemSettings> {
+  try {
+    const redis = getRedis();
+    const settings = await redis.get<SystemSettings>(SETTINGS_KEY);
+    return {
+      freeTrialDays: settings?.freeTrialDays || FREE_TRIAL_DAYS,
+      freeDailyLimit: settings?.freeDailyLimit || FREE_DAILY_LIMIT,
+    };
+  } catch {
+    return { freeTrialDays: FREE_TRIAL_DAYS, freeDailyLimit: FREE_DAILY_LIMIT };
+  }
+}
 
 // ========== Redis 客户端 ==========
 let redisClient: Redis | null = null;
@@ -103,13 +122,16 @@ export async function canUse(userId: string, type: "chat" | "image"): Promise<{ 
     return { allowed: false, reason: "套餐额度已用完，请续费", quota };
   }
 
+  // 从管理后台读取动态设置
+  const settings = await getSystemSettings();
+
   // 检查免费试用期是否过期
   if (quota.freeTrialStarted) {
     const trialStart = new Date(quota.freeTrialStarted);
     const now = new Date();
     const daysSinceStart = (now.getTime() - trialStart.getTime()) / (1000 * 86400);
-    if (daysSinceStart > FREE_TRIAL_DAYS) {
-      return { allowed: false, reason: `免费试用期已结束（${FREE_TRIAL_DAYS}天），请兑换体验卡或购买套餐`, quota };
+    if (daysSinceStart > settings.freeTrialDays) {
+      return { allowed: false, reason: `免费试用期已结束（${settings.freeTrialDays}天），请兑换体验卡或购买套餐`, quota };
     }
   } else {
     // 老用户没有 freeTrialStarted 字段，补记录
@@ -123,7 +145,7 @@ export async function canUse(userId: string, type: "chat" | "image"): Promise<{ 
     quota.dailyFreeDate = today;
   }
 
-  if (quota.dailyFreeUsed < FREE_DAILY_LIMIT) {
+  if (quota.dailyFreeUsed < settings.freeDailyLimit) {
     return { allowed: true, quota };
   }
 

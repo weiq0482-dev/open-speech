@@ -580,10 +580,28 @@ export default function Home() {
 
                 {/* 抖音引导 */}
                 <div className="bg-[var(--card)] rounded-2xl p-5 border border-[var(--border)] max-w-xl mx-auto flex items-center gap-5">
-                  <img src="/douyin-qr.png" alt="抖音" className="w-28 h-28 rounded-xl shrink-0" />
+                  <img src="/douyin-qr.png" alt="抖音" className="w-36 h-36 rounded-xl shrink-0" />
                   <div className="text-left flex-1">
-                    <p className="text-sm font-semibold">关注抖音号 arch8288</p>
+                    <p className="font-semibold">关注抖音号 arch8288</p>
                     <p className="text-xs text-[var(--muted)] mt-1">获取免费体验卡 · 教程 · 最新功能更新</p>
+                  </div>
+                </div>
+
+                {/* 超级梦想家群 */}
+                <div className="bg-[var(--card)] rounded-2xl p-5 border border-[var(--border)] max-w-xl mx-auto">
+                  <div className="flex items-center gap-5">
+                    <img src="/wechat-qr.png" alt="微信群" className="w-36 h-36 rounded-xl shrink-0" />
+                    <div className="text-left flex-1">
+                      <p className="font-semibold">加入「超级梦想家」群</p>
+                      <p className="text-xs text-[var(--muted)] mt-1">微信扫码加入 · 把想法变成现实</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-[var(--border)] text-xs text-[var(--muted)] leading-relaxed space-y-2">
+                    <p className="font-medium text-[var(--foreground)]">🔥 群介绍：这里只干一件事——把想法变成现实</p>
+                    <p>你有脑洞，我有技术；你有梦想，我有落地能力。</p>
+                    <p>本群专为敢想、敢做、敢折腾的人而生。不管是创业点子、工具需求、小程序/APP/网站想法、AI工具、自动化脚本、效率系统、商业小项目……只要你说得出，我就用资深开发经验帮你：梳理逻辑 → 设计方案 → 给出实现路径 → 手把手陪你落地。</p>
+                    <p>不画饼、不空谈、不割韭菜。一群梦想家，一起把&ldquo;我想&rdquo;变成&ldquo;我做到&rdquo;。</p>
+                    <p className="font-medium text-[var(--foreground)]">你的超级梦想，从这里开始上线。</p>
                   </div>
                 </div>
               </div>
