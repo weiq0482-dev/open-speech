@@ -95,9 +95,24 @@ function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => v
 
 export default function Home() {
   const authToken = useChatStore((s) => s.authToken);
+  const userEmail = useChatStore((s) => s.userEmail);
+  const [hydrated, setHydrated] = useState(false);
 
-  // 未登录时显示登录页面
-  if (!authToken) {
+  useEffect(() => {
+    setHydrated(true);
+  }, []);
+
+  // 等待客户端水合完成，避免 SSR 闪烁
+  if (!hydrated) {
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+        <div className="animate-pulse text-gray-400 text-sm">加载中...</div>
+      </div>
+    );
+  }
+
+  // 未登录时显示登录页面（双重检查）
+  if (!authToken || !userEmail) {
     return <LoginPage />;
   }
 
