@@ -16,10 +16,12 @@ function getDeviceRedis(): Redis {
 
 async function isRegisteredDevice(userId: string): Promise<boolean> {
   try {
+    // 邮箱验证用户（em_ 开头）已通过邮箱验证码认证，无需再检查设备注册
+    if (userId.startsWith("em_")) return true;
     const redis = getDeviceRedis();
     // 方式1：检查注册标记（新用户通过 /api/device 注册时写入）
-    const marker = await redis.get<string>(`registered:${userId}`);
-    if (marker === "1") return true;
+    const marker = await redis.get(`registered:${userId}`);
+    if (String(marker) === "1") return true;
     // 方式2：兼容老用户——检查是否已有 quota 记录（只有真实用过的才有）
     const quota = await redis.get(`quota:${userId}`);
     if (quota) {

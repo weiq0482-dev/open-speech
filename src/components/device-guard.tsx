@@ -12,16 +12,21 @@ export function DeviceGuard() {
 
   useEffect(() => {
     if (initialized.current) return;
-    initialized.current = true;
 
-    // 已登录邮箱用户：验证 token 有效性，跳过设备指纹
+    // 已登录邮箱用户：userId 以 em_ 开头，已通过邮箱认证，跳过设备注册
     if (authToken && userEmail) {
+      const currentUserId = useChatStore.getState().userId;
+      if (currentUserId && currentUserId.startsWith("em_")) {
+        initialized.current = true;
+        return;
+      }
+      // token 存在但 userId 不是 em_ 格式 → 验证 token 获取正确 userId
+      initialized.current = true;
       fetch("/api/auth/me", {
         headers: { Authorization: `Bearer ${authToken}` },
       })
         .then((resp) => {
           if (resp.ok) return resp.json();
-          // token 过期，清除登录态，走设备指纹流程
           useChatStore.getState().logout();
           return null;
         })
@@ -36,6 +41,7 @@ export function DeviceGuard() {
       return;
     }
 
+    initialized.current = true;
     // 未登录：设备指纹注册
     registerDevice();
 
