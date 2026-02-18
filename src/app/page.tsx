@@ -5,6 +5,7 @@ import { useChatStore, type Attachment } from "@/store/chat-store";
 import { Sidebar } from "@/components/sidebar";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessage } from "@/components/chat-message";
+import { LoginPage } from "@/components/login-page";
 import { Menu, SquarePen, Sparkles, Headphones, Send, X } from "lucide-react";
 
 function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => void }) {
@@ -93,6 +94,17 @@ function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => v
 }
 
 export default function Home() {
+  const authToken = useChatStore((s) => s.authToken);
+
+  // 未登录时显示登录页面
+  if (!authToken) {
+    return <LoginPage />;
+  }
+
+  return <ChatApp />;
+}
+
+function ChatApp() {
   const {
     activeConversationId,
     sidebarOpen,

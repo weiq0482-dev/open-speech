@@ -518,29 +518,6 @@ export function Sidebar() {
             <span>{darkMode ? "浅色模式" : "深色模式"}</span>
           </button>
 
-          {/* 登录/账户 */}
-          {userEmail ? (
-            <div className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm">
-              <Mail size={18} className="text-green-500 shrink-0" />
-              <span className="truncate text-xs text-[var(--muted)]">{userEmail}</span>
-              <button
-                onClick={doLogout}
-                className="ml-auto p-1 rounded-lg text-[var(--muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                title="退出登录"
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAuth(true)}
-              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm text-blue-500"
-            >
-              <LogIn size={18} />
-              <span>邮箱登录 / 注册</span>
-            </button>
-          )}
-
           {/* API Key / 兑换码 */}
           <button
             onClick={() => setShowApiKeyInput(!showApiKeyInput)}
@@ -604,6 +581,29 @@ export function Sidebar() {
               </span>
             )}
           </button>
+
+          {/* 登录/账户 */}
+          {userEmail ? (
+            <div className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm">
+              <Mail size={18} className="text-green-500 shrink-0" />
+              <span className="truncate text-xs text-[var(--muted)]">{userEmail}</span>
+              <button
+                onClick={doLogout}
+                className="ml-auto p-1 rounded-lg text-[var(--muted)] hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                title="退出登录"
+              >
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowAuth(true)}
+              className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm text-blue-500"
+            >
+              <LogIn size={18} />
+              <span>邮箱登录 / 注册</span>
+            </button>
+          )}
         </div>
       </aside>
 
