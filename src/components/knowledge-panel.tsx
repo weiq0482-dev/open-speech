@@ -128,9 +128,10 @@ export function KnowledgePanel({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowAddForm(!showAddForm)}
-              className="px-3 py-1.5 rounded-lg bg-amber-500 text-white text-xs hover:bg-amber-600 transition-colors"
+              className="px-2 py-1 rounded-lg text-[var(--muted)] hover:bg-[var(--sidebar-hover)] text-[10px] transition-colors"
+              title="手动添加知识"
             >
-              + 添加知识
+              {showAddForm ? "收起" : "+ 手动添加"}
             </button>
             <button
               onClick={onClose}
