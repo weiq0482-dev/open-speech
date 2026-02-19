@@ -16,6 +16,14 @@ const redis = new Redis({
 
 const THREAD_PREFIX = "thread:";
 const ALL_THREADS_KEY = "all_threads";
+const QUOTA_PREFIX = "quota:";
+const PROFILE_PREFIX = "profile:";
+const KB_PREFIX = "kb:";
+const KB_INDEX = "kb_index:";
+const KB_TAGS = "kb_tags:";
+const TRASH_PREFIX = "trash:";
+const ALL_TRASH_KEY = "all_trash";
+const crypto = require("crypto");
 
 // 兼容读取：旧数据是 JSON 数组，新数据是 Redis Set
 async function getThreadUserIds() {
@@ -442,6 +450,210 @@ app.post("/api/usage-log", async (req, res) => {
     if (logs.length > 100) logs.splice(0, logs.length - 100);
     await redis.set(logKey, logs);
     res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== 账户重置（数据移入垃圾箱） ==========
+function emailToUserId(email) {
+  const hash = crypto.createHash("sha256").update(email.toLowerCase().trim()).digest("hex");
+  return `em_${hash.slice(0, 16)}`;
+}
+
+// 查找用户（支持 userId 或邮箱）
+function resolveUserId(input) {
+  if (!input) return null;
+  input = input.trim();
+  if (input.startsWith("em_") || input.startsWith("u_")) return input;
+  if (input.includes("@")) return emailToUserId(input);
+  return input;
+}
+
+// 重置用户账户 - 将数据备份到垃圾箱后清除
+app.post("/api/users/reset", async (req, res) => {
+  try {
+    const { userId: rawId, resetProfile, resetKnowledge, resetQuota, resetAll } = req.body;
+    const userId = resolveUserId(rawId);
+    if (!userId) return res.status(400).json({ error: "缺少 userId 或邮箱" });
+
+    const trashId = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const trashData = { id: trashId, userId, deletedAt: new Date().toISOString(), items: {} };
+
+    const doAll = !!resetAll;
+
+    // 备份并清除用户资料
+    if (doAll || resetProfile) {
+      const profile = await redis.get(`${PROFILE_PREFIX}${userId}`);
+      if (profile) {
+        trashData.items.profile = profile;
+        await redis.del(`${PROFILE_PREFIX}${userId}`);
+      }
+    }
+
+    // 备份并清除知识库
+    if (doAll || resetKnowledge) {
+      const indexKey = `${KB_INDEX}${userId}`;
+      const itemIds = (await redis.lrange(indexKey, 0, -1)) || [];
+      const kbItems = [];
+      for (const itemId of itemIds) {
+        const item = await redis.get(`${KB_PREFIX}${userId}:${itemId}`);
+        if (item) {
+          kbItems.push(item);
+          await redis.del(`${KB_PREFIX}${userId}:${itemId}`);
+        }
+      }
+      if (kbItems.length > 0) trashData.items.knowledge = kbItems;
+      await redis.del(indexKey);
+      await redis.del(`${KB_TAGS}${userId}`);
+    }
+
+    // 备份并清除配额
+    if (doAll || resetQuota) {
+      const quota = await redis.get(`${QUOTA_PREFIX}${userId}`);
+      if (quota) {
+        trashData.items.quota = quota;
+        await redis.del(`${QUOTA_PREFIX}${userId}`);
+      }
+    }
+
+    // 保存到垃圾箱
+    if (Object.keys(trashData.items).length > 0) {
+      await redis.set(`${TRASH_PREFIX}${trashId}`, trashData);
+      // 添加到垃圾箱索引
+      await redis.lpush(ALL_TRASH_KEY, trashId);
+    }
+
+    console.log(`[账户重置] ${userId} | 项目: ${Object.keys(trashData.items).join(", ")}`);
+    res.json({ success: true, trashId, resetItems: Object.keys(trashData.items) });
+  } catch (err) {
+    console.error("[POST /api/users/reset]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ========== 垃圾箱管理 ==========
+
+// 查看垃圾箱列表
+app.get("/api/trash", async (req, res) => {
+  try {
+    const trashIds = (await redis.lrange(ALL_TRASH_KEY, 0, 49)) || [];
+    const items = [];
+    for (const id of trashIds) {
+      const data = await redis.get(`${TRASH_PREFIX}${id}`);
+      if (data) {
+        items.push({
+          id: data.id,
+          userId: data.userId,
+          deletedAt: data.deletedAt,
+          types: Object.keys(data.items),
+          summary: {
+            profile: !!data.items.profile,
+            knowledgeCount: data.items.knowledge?.length || 0,
+            quota: !!data.items.quota,
+          },
+        });
+      }
+    }
+    res.json({ items });
+  } catch (err) {
+    console.error("[GET /api/trash]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 查看垃圾箱详情
+app.get("/api/trash/:trashId", async (req, res) => {
+  try {
+    const data = await redis.get(`${TRASH_PREFIX}${req.params.trashId}`);
+    if (!data) return res.status(404).json({ error: "垃圾箱项目不存在" });
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 恢复垃圾箱数据
+app.post("/api/trash/restore", async (req, res) => {
+  try {
+    const { trashId } = req.body;
+    if (!trashId) return res.status(400).json({ error: "缺少 trashId" });
+
+    const data = await redis.get(`${TRASH_PREFIX}${trashId}`);
+    if (!data) return res.status(404).json({ error: "垃圾箱项目不存在" });
+
+    const userId = data.userId;
+    const restored = [];
+
+    // 恢复用户资料
+    if (data.items.profile) {
+      await redis.set(`${PROFILE_PREFIX}${userId}`, data.items.profile);
+      restored.push("profile");
+    }
+
+    // 恢复知识库
+    if (data.items.knowledge && data.items.knowledge.length > 0) {
+      const indexKey = `${KB_INDEX}${userId}`;
+      for (const item of data.items.knowledge) {
+        await redis.set(`${KB_PREFIX}${userId}:${item.id}`, item);
+        await redis.lpush(indexKey, item.id);
+      }
+      restored.push(`knowledge(${data.items.knowledge.length})`);
+    }
+
+    // 恢复配额
+    if (data.items.quota) {
+      await redis.set(`${QUOTA_PREFIX}${userId}`, data.items.quota);
+      restored.push("quota");
+    }
+
+    // 从垃圾箱中移除
+    await redis.del(`${TRASH_PREFIX}${trashId}`);
+    await redis.lrem(ALL_TRASH_KEY, 0, trashId);
+
+    console.log(`[垃圾箱恢复] ${userId} | 恢复: ${restored.join(", ")}`);
+    res.json({ success: true, restored });
+  } catch (err) {
+    console.error("[POST /api/trash/restore]", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 永久删除垃圾箱数据
+app.delete("/api/trash/:trashId", async (req, res) => {
+  try {
+    const { trashId } = req.params;
+    await redis.del(`${TRASH_PREFIX}${trashId}`);
+    await redis.lrem(ALL_TRASH_KEY, 0, trashId);
+    console.log(`[垃圾箱] 永久删除: ${trashId}`);
+    res.json({ success: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 查询用户信息（支持邮箱查询）
+app.get("/api/users/lookup", async (req, res) => {
+  try {
+    const input = req.query.q;
+    const userId = resolveUserId(input);
+    if (!userId) return res.status(400).json({ error: "请输入 userId 或邮箱" });
+
+    const [profile, quota, locked, kbCount] = await Promise.all([
+      redis.get(`${PROFILE_PREFIX}${userId}`),
+      redis.get(`${QUOTA_PREFIX}${userId}`),
+      redis.get(`locked:${userId}`),
+      redis.llen(`${KB_INDEX}${userId}`),
+    ]);
+
+    res.json({
+      userId,
+      email: input?.includes("@") ? input.trim() : null,
+      profile: profile || null,
+      quota: quota || null,
+      locked: locked || null,
+      knowledgeCount: kbCount || 0,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

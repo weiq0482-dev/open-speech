@@ -87,6 +87,8 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
   const [kbResults, setKbResults] = useState<any[]>([]);
   const [kbSearching, setKbSearching] = useState(false);
   const kbRef = useRef<HTMLDivElement>(null);
+  const kbBtnRef = useRef<HTMLButtonElement>(null);
+  const [kbPos, setKbPos] = useState<{ bottom: number; left: number } | null>(null);
 
   const activeConv = getActiveConversation();
   const isEmpty = !activeConv || activeConv.messages.length === 0;
@@ -110,6 +112,14 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // 计算知识库弹出面板位置
+  useEffect(() => {
+    if (showKbSearch && kbBtnRef.current) {
+      const rect = kbBtnRef.current.getBoundingClientRect();
+      setKbPos({ bottom: window.innerHeight - rect.top + 4, left: Math.max(8, rect.left) });
+    }
+  }, [showKbSearch]);
 
   // 知识库搜索
   const handleKbSearch = useCallback(async (q: string) => {
@@ -484,8 +494,9 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
             </div>
 
             {/* 知识库搜索按钮 */}
-            <div ref={kbRef} className="relative">
+            <div ref={kbRef}>
               <button
+                ref={kbBtnRef}
                 onClick={() => setShowKbSearch(!showKbSearch)}
                 className={cn(
                   "flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors text-sm",
@@ -498,8 +509,11 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
                 <BookOpen size={16} />
                 <span className="hidden sm:inline">知识库</span>
               </button>
-              {showKbSearch && (
-                <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl z-[9999] animate-fade-in">
+              {showKbSearch && kbPos && (
+                <div
+                  className="fixed w-80 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl z-[9999] animate-fade-in"
+                  style={{ bottom: kbPos.bottom, left: kbPos.left }}
+                >
                   <div className="p-3 border-b border-[var(--border)]">
                     <div className="flex items-center gap-2">
                       <Search size={14} className="text-[var(--muted)]" />

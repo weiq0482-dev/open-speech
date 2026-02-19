@@ -672,6 +672,32 @@ function ChatApp() {
                   </div>
                 </div>
 
+                {/* 专家库推荐 - 根据用户兴趣/职业匹配 */}
+                {useChatStore.getState().gems.length > 0 && (
+                  <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-left max-w-2xl mx-auto">
+                    <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                      <Sparkles size={16} className="text-purple-500" />
+                      为你匹配的专家
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {useChatStore.getState().gems.slice(0, 6).map((gem) => (
+                        <div
+                          key={gem.id}
+                          className="p-2.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors text-center"
+                          onClick={() => {
+                            const cid = createConversation(gem.id);
+                            useChatStore.getState().setActiveGem(gem.id);
+                          }}
+                        >
+                          <span className="text-xl">{gem.icon}</span>
+                          <p className="text-xs font-medium mt-1 truncate">{gem.name}</p>
+                          <p className="text-[10px] text-[var(--muted)] mt-0.5 line-clamp-1">{gem.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* 二维码并排区域（从管理后台动态配置） */}
                 <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4">
                   {/* 抖音 */}

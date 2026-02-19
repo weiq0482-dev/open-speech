@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     await redis.set(`${PROFILE_PREFIX}${userId}`, profile);
 
-    // 根据兴趣预设知识库分类标签
+    // 根据兴趣预设知识库分类标签 + 预设知识内容
     try {
       const kbTagsKey = `kb_tags:${userId}`;
       const defaultTags = [...allInterests];
@@ -90,9 +90,15 @@ export async function POST(req: NextRequest) {
         });
       }
       if (hasProfession) defaultTags.push(profession.trim());
-      // 加上通用标签
       defaultTags.push("AI对话", "深度研究");
       await redis.set(kbTagsKey, defaultTags.slice(0, 20));
+
+      // 预设知识库入门内容
+      const kbIndexKey = `kb_index:${userId}`;
+      const existingCount = await redis.llen(kbIndexKey);
+      if (existingCount === 0) {
+        await seedKnowledgeBase(redis, userId, allInterests, profession?.trim(), customInterests?.trim());
+      }
     } catch {}
 
     // 先用预设模板生成基础专家
@@ -412,4 +418,95 @@ function generateExpertsForInterests(
   }
 
   return experts;
+}
+
+// ========== 知识库预设内容 ==========
+const INTEREST_KB_SEEDS: Record<string, Array<{ title: string; content: string; tags: string[] }>> = {
+  "编程开发": [
+    { title: "高效编程的 10 个习惯", content: "1. 先想清楚再写代码，用伪代码理清逻辑\n2. 写有意义的变量和函数命名\n3. 小步提交，频繁 commit\n4. 写代码的同时写注释和文档\n5. 学会使用调试工具而非 print 大法\n6. 代码复审（Code Review）是最好的学习方式\n7. 重构是持续的，不要等到「以后」\n8. 善用 AI 辅助编程，但要理解生成的代码\n9. 保持学习新技术的习惯\n10. 休息好才能写出好代码", tags: ["编程开发", "效率"] },
+    { title: "2025 热门技术栈速查", content: "前端：React/Next.js、Vue 3、TailwindCSS、TypeScript\n后端：Node.js、Python FastAPI、Go、Rust\nAI/ML：PyTorch、LangChain、Hugging Face、OpenAI API\n数据库：PostgreSQL、Redis、MongoDB、Supabase\n部署：Vercel、Docker、Kubernetes、Cloudflare Workers\n移动端：React Native、Flutter、Swift UI", tags: ["编程开发", "技术栈"] },
+  ],
+  "AI人工智能": [
+    { title: "AI 核心概念速览", content: "大语言模型（LLM）：通过海量文本训练的神经网络，能理解和生成自然语言\nRAG（检索增强生成）：结合知识库检索来增强 AI 回答的准确性\nPrompt Engineering：通过精心设计提示词来引导 AI 产出高质量回答\nFine-tuning：在预训练模型基础上用特定数据进一步训练\nAgent：能自主使用工具、规划步骤来完成复杂任务的 AI 系统\nMultimodal：能同时处理文本、图片、音频、视频的 AI 模型", tags: ["AI人工智能", "概念"] },
+    { title: "常用 AI 工具推荐", content: "对话助手：ChatGPT、Claude、Gemini\n代码助手：GitHub Copilot、Cursor、Windsurf\n图片生成：Midjourney、DALL-E 3、Stable Diffusion\n视频生成：Sora、Runway、Pika\n音乐生成：Suno、Udio\n文档处理：NotebookLM、Perplexity\n开发框架：LangChain、LlamaIndex、Dify", tags: ["AI人工智能", "工具"] },
+  ],
+  "设计艺术": [
+    { title: "设计原则四要素", content: "1. 对比（Contrast）：通过大小、颜色、形状的差异创造视觉层次\n2. 重复（Repetition）：统一的视觉元素贯穿整个设计，建立一致性\n3. 对齐（Alignment）：每个元素都应与其他元素有视觉连接\n4. 亲密性（Proximity）：相关的元素放在一起，建立逻辑分组\n\n——出自 Robin Williams《写给大家看的设计书》", tags: ["设计艺术", "原则"] },
+  ],
+  "商业创业": [
+    { title: "商业模式画布九要素", content: "1. 客户细分：你服务谁？\n2. 价值主张：你为客户解决什么问题？\n3. 渠道通路：如何触达客户？\n4. 客户关系：如何维护客户关系？\n5. 收入来源：如何赚钱？\n6. 核心资源：需要哪些关键资源？\n7. 关键业务：最重要的事情是什么？\n8. 重要伙伴：谁是你的合作伙伴？\n9. 成本结构：主要成本有哪些？\n\n——Alexander Osterwalder《商业模式新生代》", tags: ["商业创业", "框架"] },
+  ],
+  "科学研究": [
+    { title: "科研论文写作框架", content: "IMRaD 结构：\n- Introduction（引言）：为什么做？研究背景、问题、目的\n- Methods（方法）：怎么做？实验设计、数据采集\n- Results（结果）：发现了什么？数据展示、统计分析\n- Discussion（讨论）：意味着什么？结果解释、局限性、未来方向\n\n写作顺序建议：Methods → Results → Introduction → Discussion → Abstract", tags: ["科学研究", "写作"] },
+  ],
+  "自媒体": [
+    { title: "爆款内容公式", content: "标题公式：数字 + 痛点/好奇 + 解决方案\n例：「3个方法让你的视频播放量翻10倍」\n\n内容结构：Hook（3秒抓注意力）→ 痛点共鸣 → 干货价值 → 行动号召\n\n平台特点：\n- 抖音/快手：15-60秒竖屏，前3秒决定生死\n- 小红书：精美图片+实用笔记，标题要有关键词\n- B站：深度内容，前30秒要有吸引力\n- 公众号：深度长文，标题决定打开率", tags: ["自媒体", "运营"] },
+  ],
+  "语言学习": [
+    { title: "语言学习高效方法", content: "1. 沉浸式输入：每天听/看目标语言内容 30 分钟\n2. 间隔重复（Spaced Repetition）：用 Anki 等工具科学记忆单词\n3. 影子跟读（Shadowing）：跟着母语者同步朗读，提升口语\n4. 主动输出：每天写日记或找语伴对话\n5. 语境学习：不要孤立背单词，在句子和场景中记忆\n6. 设定微目标：每天 20 个新词 + 复习 50 个旧词", tags: ["语言学习", "方法"] },
+  ],
+  "心理成长": [
+    { title: "情绪管理工具箱", content: "认知重构：识别负面自动思维 → 质疑它的证据 → 替换为更平衡的想法\n\n正念练习：关注当下呼吸，不评判地观察自己的想法和情绪\n\n情绪日记：记录触发事件 → 当时的想法 → 产生的情绪 → 行为反应\n\n5-4-3-2-1 接地技术：看到5个东西、触摸4个东西、听到3个声音、闻到2个气味、尝到1个味道\n\n重要提醒：如有持续的心理困扰，请寻求专业心理咨询帮助", tags: ["心理成长", "工具"] },
+  ],
+  "写作创作": [
+    { title: "写作提升核心技巧", content: "1. 每天写：不管好坏，保持写作习惯\n2. 先写后改：初稿不要追求完美，修改才是核心\n3. 读优秀作品：模仿是学习的开始\n4. 金句积累：随时记录灵感和好句子\n5. 结构先行：写长文前先列大纲\n6. 删减冗余：好文章是改出来的，能删则删\n7. 让别人读：旁观者清，反馈很重要", tags: ["写作创作", "技巧"] },
+  ],
+  "生活达人": [
+    { title: "高效生活管理清单", content: "时间管理：\n- 番茄工作法：25分钟专注 + 5分钟休息\n- 每日三件事：确定今天最重要的3件事\n\n家居收纳：\n- 断舍离原则：1年没用的东西就处理掉\n- 一进一出：买一件新的就处理一件旧的\n\n健康习惯：\n- 7-8小时睡眠\n- 每天喝够2L水\n- 每周至少3次运动，每次30分钟", tags: ["生活达人", "效率"] },
+  ],
+};
+
+async function seedKnowledgeBase(
+  redis: Redis,
+  userId: string,
+  interests: string[],
+  profession?: string,
+  customInterests?: string
+) {
+  const KB_PREFIX = "kb:";
+  const KB_INDEX = "kb_index:";
+  const indexKey = `${KB_INDEX}${userId}`;
+  const items: Array<{ title: string; content: string; tags: string[] }> = [];
+
+  // 根据兴趣收集预设内容
+  for (const interest of interests) {
+    const seeds = INTEREST_KB_SEEDS[interest];
+    if (seeds) items.push(...seeds);
+  }
+
+  // 如果有职业，添加一条职业相关的通用知识
+  if (profession) {
+    items.push({
+      title: `${profession} - 我的职业方向`,
+      content: `我的职业/专业方向是${profession}。这是我的核心领域，相关的学习资料和工作经验会持续积累在知识库中。\n\n可以通过「深度研究」功能探索最新行业动态，研究成果会自动保存到知识库。`,
+      tags: [profession, "职业"],
+    });
+  }
+
+  // 如果有自定义兴趣，添加一条自定义标签的知识
+  if (customInterests) {
+    items.push({
+      title: `我的特别关注：${customInterests.slice(0, 30)}`,
+      content: `自定义关注领域：${customInterests}\n\n这些是我特别感兴趣的方向，可以通过 AI 对话和深度研究来不断积累相关知识。`,
+      tags: customInterests.split(/[,，、\s]+/).filter(Boolean).slice(0, 5),
+    });
+  }
+
+  // 限制最多预设 10 条
+  const toSeed = items.slice(0, 10);
+
+  for (const item of toSeed) {
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const kbItem = {
+      id,
+      title: item.title,
+      content: item.content,
+      summary: item.content.slice(0, 200),
+      source: "preset" as const,
+      tags: item.tags,
+      savedAt: new Date().toISOString(),
+    };
+    await redis.set(`${KB_PREFIX}${userId}:${id}`, kbItem);
+    await redis.lpush(indexKey, id);
+  }
 }

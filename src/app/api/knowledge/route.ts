@@ -26,7 +26,7 @@ export interface KnowledgeItem {
   title: string;
   content: string;
   summary: string;
-  source: "deep-research" | "chat" | "manual";
+  source: "deep-research" | "chat" | "manual" | "preset";
   sourceUrl?: string;
   tags: string[];
   savedAt: string;

@@ -105,7 +105,9 @@
       <button class="tab-btn active" onclick="switchTab('chat')">💬 客服</button>
       <button class="tab-btn" onclick="switchTab('coupon')">🎫 兑换码</button>
       <button class="tab-btn" onclick="switchTab('monitor')">👁 监控</button>
-      <button class="tab-btn" onclick="switchTab('settings')">⚙️ 设置</button>
+      <button class="tab-btn" onclick="switchTab('user')">👤 用户</button>
+      <button class="tab-btn" onclick="switchTab('trash')">🗑 回收</button>
+      <button class="tab-btn" onclick="switchTab('settings')">⚙️</button>
     </div>
     <!-- 客服标签内容 -->
     <div id="tabChat">
@@ -184,6 +186,48 @@
         <div style="font-size:12px;font-weight:600;margin-top:4px;">📋 全部用户</div>
         <div id="userList" style="display:flex;flex-direction:column;gap:6px;max-height:300px;overflow-y:auto;">
           <div style="text-align:center;color:#999;font-size:12px;padding:12px;">点击「刷新」加载</div>
+        </div>
+      </div>
+    </div>
+    <!-- 用户管理标签 -->
+    <div id="tabUser" class="hidden" style="overflow-y:auto;max-height:calc(100vh - 100px);">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <h3 style="font-size:14px;font-weight:600;">👤 用户管理</h3>
+        <!-- 用户查找 -->
+        <div style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;">🔍 查找用户</div>
+          <div style="display:flex;gap:6px;">
+            <input id="lookupInput" placeholder="输入邮箱或 userId" style="flex:1;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+            <button onclick="lookupUser()" style="padding:6px 12px;background:#3b82f6;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;white-space:nowrap;">查找</button>
+          </div>
+          <div id="lookupResult" style="margin-top:8px;"></div>
+        </div>
+        <!-- 账户重置 -->
+        <div style="padding:10px;background:#fff;border:1px solid #e5e7eb;border-radius:8px;">
+          <div style="font-size:12px;font-weight:600;margin-bottom:8px;">🔄 账户重置</div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;">
+            <input id="resetInput" placeholder="输入邮箱或 userId" style="flex:1;padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:12px;outline:none;" />
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button onclick="resetUser('all')" style="padding:6px 12px;background:#dc2626;color:#fff;border:none;border-radius:6px;font-size:11px;cursor:pointer;">全部重置</button>
+            <button onclick="resetUser('profile')" style="padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:11px;cursor:pointer;background:#fff;">重置资料</button>
+            <button onclick="resetUser('knowledge')" style="padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:11px;cursor:pointer;background:#fff;">重置知识库</button>
+            <button onclick="resetUser('quota')" style="padding:6px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:11px;cursor:pointer;background:#fff;">重置配额</button>
+          </div>
+          <div id="resetResult" style="margin-top:8px;"></div>
+          <div style="margin-top:8px;font-size:10px;color:#999;">⚠️ 重置的数据会移入垃圾箱，可在「回收」标签中恢复</div>
+        </div>
+      </div>
+    </div>
+    <!-- 垃圾箱标签 -->
+    <div id="tabTrash" class="hidden" style="overflow-y:auto;max-height:calc(100vh - 100px);">
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h3 style="font-size:14px;font-weight:600;">🗑 垃圾箱</h3>
+          <button onclick="loadTrash()" style="padding:4px 10px;border:1px solid #e0e3e8;border-radius:6px;font-size:11px;cursor:pointer;background:#fff;">刷新</button>
+        </div>
+        <div id="trashList" style="display:flex;flex-direction:column;gap:8px;">
+          <div style="text-align:center;color:#999;font-size:12px;padding:20px;">点击「刷新」加载</div>
         </div>
       </div>
     </div>
@@ -643,16 +687,21 @@
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelector(`.tab-btn[onclick="switchTab('${tab}')"]`).classList.add('active');
 
-      document.getElementById('tabChat').classList.toggle('hidden', tab !== 'chat');
-      document.getElementById('tabCoupon').classList.toggle('hidden', tab !== 'coupon');
-      document.getElementById('tabMonitor').classList.toggle('hidden', tab !== 'monitor');
-      document.getElementById('tabSettings').classList.toggle('hidden', tab !== 'settings');
+      ['tabChat','tabCoupon','tabMonitor','tabSettings','tabUser','tabTrash'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.classList.add('hidden');
+      });
+      const tabMap = { chat:'tabChat', coupon:'tabCoupon', monitor:'tabMonitor', settings:'tabSettings', user:'tabUser', trash:'tabTrash' };
+      const activeTab = document.getElementById(tabMap[tab]);
+      if (activeTab) activeTab.classList.remove('hidden');
+
       document.getElementById('mainChat').classList.toggle('hidden', tab !== 'chat');
-      document.getElementById('mainCoupon').classList.toggle('hidden', tab !== 'coupon');
+      document.getElementById('mainCoupon').classList.toggle('hidden', tab !== 'coupon' && tab !== 'user' && tab !== 'trash');
 
       if (tab === 'coupon') fetchCoupons();
       if (tab === 'settings') loadSettings();
       if (tab === 'monitor') loadMonitor();
+      if (tab === 'trash') loadTrash();
     }
 
     // === 系统设置 ===
@@ -954,6 +1003,141 @@
         listDiv.innerHTML = html;
       } catch (err) {
         listDiv.innerHTML = `<div style="color:#dc2626;font-size:12px;padding:12px;">加载失败: ${err.message}</div>`;
+      }
+    }
+
+    // === 用户管理 ===
+    async function lookupUser() {
+      const input = document.getElementById('lookupInput').value.trim();
+      const resultDiv = document.getElementById('lookupResult');
+      if (!input) return;
+      resultDiv.innerHTML = '<span style="color:#999;font-size:11px;">查找中...</span>';
+      try {
+        const resp = await fetch(`/api/users/lookup?q=${encodeURIComponent(input)}`);
+        const data = await resp.json();
+        if (data.error) {
+          resultDiv.innerHTML = `<span style="color:#dc2626;font-size:11px;">❌ ${data.error}</span>`;
+          return;
+        }
+        let html = `<div style="background:#f9fafb;border-radius:8px;padding:10px;font-size:11px;">`;
+        html += `<div style="font-weight:600;margin-bottom:4px;">userId: <span style="font-family:monospace;">${data.userId}</span></div>`;
+        if (data.email) html += `<div>邮箱: ${escapeHtml(data.email)}</div>`;
+        if (data.profile) {
+          html += `<div>兴趣: ${(data.profile.interests || []).join(', ') || '无'}</div>`;
+          html += `<div>职业: ${data.profile.profession || '未设置'}</div>`;
+          html += `<div>设置完成: ${data.profile.setupCompleted ? '✅' : '❌'}</div>`;
+        } else {
+          html += `<div style="color:#999;">未设置用户资料</div>`;
+        }
+        html += `<div>知识库: ${data.knowledgeCount || 0} 条</div>`;
+        if (data.quota) {
+          const q = data.quota;
+          html += `<div>套餐: ${q.plan} | 对话剩余: ${q.chatRemaining} | 生图剩余: ${q.imageRemaining} | 今日已用: ${q.dailyFreeUsed}</div>`;
+        }
+        html += `<div>锁定: ${data.locked ? '🔒 ' + data.locked : '无'}</div>`;
+        html += `</div>`;
+        resultDiv.innerHTML = html;
+        // 同步到重置输入框
+        document.getElementById('resetInput').value = input;
+      } catch (err) {
+        resultDiv.innerHTML = `<span style="color:#dc2626;font-size:11px;">❌ ${err.message}</span>`;
+      }
+    }
+
+    async function resetUser(type) {
+      const input = document.getElementById('resetInput').value.trim();
+      const resultDiv = document.getElementById('resetResult');
+      if (!input) return alert('请先输入邮箱或 userId');
+      const typeLabel = { all: '全部数据', profile: '用户资料', knowledge: '知识库', quota: '配额' }[type];
+      if (!confirm(`确认重置 ${input} 的${typeLabel}？\n数据将移入垃圾箱，可恢复。`)) return;
+      resultDiv.innerHTML = '<span style="color:#999;font-size:11px;">重置中...</span>';
+      try {
+        const body = { userId: input };
+        if (type === 'all') body.resetAll = true;
+        else body['reset' + type.charAt(0).toUpperCase() + type.slice(1)] = true;
+        const resp = await fetch('/api/users/reset', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          resultDiv.innerHTML = `<span style="color:#16a34a;font-size:11px;">✅ 已重置: ${data.resetItems.join(', ')}（垃圾箱ID: ${data.trashId}）</span>`;
+        } else {
+          resultDiv.innerHTML = `<span style="color:#dc2626;font-size:11px;">❌ ${data.error}</span>`;
+        }
+      } catch (err) {
+        resultDiv.innerHTML = `<span style="color:#dc2626;font-size:11px;">❌ ${err.message}</span>`;
+      }
+    }
+
+    // === 垃圾箱 ===
+    async function loadTrash() {
+      const listDiv = document.getElementById('trashList');
+      listDiv.innerHTML = '<div style="text-align:center;color:#999;font-size:12px;padding:12px;">加载中...</div>';
+      try {
+        const resp = await fetch('/api/trash');
+        const data = await resp.json();
+        const items = data.items || [];
+        if (items.length === 0) {
+          listDiv.innerHTML = '<div style="text-align:center;color:#16a34a;font-size:12px;padding:20px;">🗑 垃圾箱为空</div>';
+          return;
+        }
+        let html = '';
+        for (const item of items) {
+          const shortId = item.userId.length > 20 ? item.userId.slice(0, 20) + '...' : item.userId;
+          const time = new Date(item.deletedAt).toLocaleString('zh-CN');
+          let typesHtml = '';
+          if (item.summary.profile) typesHtml += '<span style="background:#dbeafe;color:#2563eb;padding:1px 6px;border-radius:3px;font-size:10px;">资料</span> ';
+          if (item.summary.knowledgeCount > 0) typesHtml += `<span style="background:#fef3c7;color:#d97706;padding:1px 6px;border-radius:3px;font-size:10px;">知识库(${item.summary.knowledgeCount})</span> `;
+          if (item.summary.quota) typesHtml += '<span style="background:#ede9fe;color:#7c3aed;padding:1px 6px;border-radius:3px;font-size:10px;">配额</span> ';
+          html += `<div style="padding:10px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;font-size:11px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-family:monospace;font-weight:600;" title="${item.userId}">${shortId}</span>
+              <span style="color:#999;font-size:10px;">${time}</span>
+            </div>
+            <div style="margin:6px 0;">${typesHtml}</div>
+            <div style="display:flex;gap:6px;">
+              <button onclick="restoreTrash('${item.id}')" style="padding:4px 10px;background:#16a34a;color:#fff;border:none;border-radius:4px;font-size:10px;cursor:pointer;">恢复</button>
+              <button onclick="deleteTrash('${item.id}')" style="padding:4px 10px;border:1px solid #fca5a5;border-radius:4px;font-size:10px;cursor:pointer;background:#fef2f2;color:#dc2626;">永久删除</button>
+            </div>
+          </div>`;
+        }
+        listDiv.innerHTML = html;
+      } catch (err) {
+        listDiv.innerHTML = `<div style="color:#dc2626;font-size:12px;padding:12px;">加载失败: ${err.message}</div>`;
+      }
+    }
+
+    async function restoreTrash(trashId) {
+      if (!confirm('确认恢复该数据？')) return;
+      try {
+        const resp = await fetch('/api/trash/restore', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trashId }),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          alert('✅ 恢复成功: ' + data.restored.join(', '));
+          loadTrash();
+        } else {
+          alert('❌ ' + data.error);
+        }
+      } catch (err) {
+        alert('恢复失败: ' + err.message);
+      }
+    }
+
+    async function deleteTrash(trashId) {
+      if (!confirm('⚠️ 永久删除后无法恢复，确认？')) return;
+      try {
+        const resp = await fetch(`/api/trash/${trashId}`, { method: 'DELETE' });
+        const data = await resp.json();
+        if (data.success) loadTrash();
+        else alert('❌ ' + data.error);
+      } catch (err) {
+        alert('删除失败: ' + err.message);
       }
     }
 
