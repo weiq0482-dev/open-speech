@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { useNotebookStore } from "@/store/notebook-store";
-import { Bot, Send, User, MessageSquareMore, Loader2 } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { useNotebookStore, DiscussMessage } from "@/store/notebook-store";
+import { Bot, Send, User, MessageSquareMore, Loader2, Image as ImageIcon, BookmarkPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 
@@ -207,17 +207,207 @@ export function NotebookChat({
           </div>
         </>
       ) : (
-        /* 讨论组占位 - Phase 2 实现 */
-        <div className="flex-1 flex flex-col items-center justify-center text-[var(--muted)] px-6">
-          <MessageSquareMore size={36} className="mb-3 opacity-30" />
-          <p className="text-sm font-medium mb-1">讨论组</p>
-          <p className="text-xs text-center">
-            分享知识库后，成员可在此讨论交流。
-            <br />
-            此功能即将推出。
-          </p>
-        </div>
+        <DiscussPanel notebookId={notebookId} userId={userId} />
       )}
+    </div>
+  );
+}
+
+// ========== 讨论组面板 ==========
+function DiscussPanel({ notebookId, userId }: { notebookId: string; userId: string }) {
+  const {
+    discussMessages,
+    loadingDiscuss,
+    fetchDiscussMessages,
+    sendDiscussMessage,
+  } = useNotebookStore();
+
+  const [input, setInput] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 初始加载 + 轮询
+  useEffect(() => {
+    fetchDiscussMessages(userId, notebookId);
+    pollRef.current = setInterval(() => {
+      fetchDiscussMessages(userId, notebookId);
+    }, 8000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [userId, notebookId, fetchDiscussMessages]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [discussMessages]);
+
+  const handleSend = useCallback(() => {
+    const msg = input.trim();
+    if (!msg) return;
+    setInput("");
+    sendDiscussMessage(userId, notebookId, "text", msg);
+  }, [input, userId, notebookId, sendDiscussMessage]);
+
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 500 * 1024) {
+      alert("图片不能超过 500KB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const base64 = ev.target?.result as string;
+      sendDiscussMessage(userId, notebookId, "image", base64);
+    };
+    reader.readAsDataURL(file);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  }, [userId, notebookId, sendDiscussMessage]);
+
+  const handleSaveToKb = useCallback(async (msg: DiscussMessage) => {
+    try {
+      const resp = await fetch("/api/notebook", { method: "GET" });
+      // 简单实现：保存到用户的第一个笔记本的来源，或提示用户
+      await fetch(`/api/notebook/${notebookId}/sources`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          type: "text",
+          title: `讨论: ${msg.userName} - ${msg.content.slice(0, 30)}...`,
+          content: msg.content,
+          metadata: { wordCount: msg.content.length },
+        }),
+      });
+      alert("已添加到来源");
+    } catch {
+      alert("保存失败");
+    }
+  }, [userId, notebookId]);
+
+  const formatTime = (ts: string) => {
+    const d = new Date(ts);
+    return `${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}`;
+  };
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* 讨论消息列表 */}
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        {loadingDiscuss && discussMessages.length === 0 ? (
+          <div className="flex items-center justify-center py-8 text-[var(--muted)] text-xs">
+            加载中...
+          </div>
+        ) : discussMessages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-[var(--muted)]">
+            <MessageSquareMore size={36} className="mb-3 opacity-30" />
+            <p className="text-sm font-medium mb-1">讨论组</p>
+            <p className="text-xs text-center">
+              分享知识库后，成员可在此讨论交流
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {discussMessages.map((msg) => {
+              const isMe = msg.userId === userId;
+              return (
+                <div key={msg.id} className={cn("flex gap-2", isMe ? "justify-end" : "")}>
+                  {!isMe && (
+                    <div className="w-7 h-7 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center shrink-0 mt-0.5 text-[10px]">
+                      {msg.userName?.charAt(0) || "?"}
+                    </div>
+                  )}
+                  <div className={cn("max-w-[75%]", isMe ? "text-right" : "")}>
+                    {!isMe && (
+                      <p className="text-[10px] text-[var(--muted)] mb-0.5">{msg.userName}</p>
+                    )}
+                    {msg.type === "image" ? (
+                      <img
+                        src={msg.content}
+                        alt="图片"
+                        className="max-w-[200px] max-h-[200px] rounded-lg border border-[var(--border)] cursor-pointer"
+                        onClick={() => window.open(msg.content, "_blank")}
+                      />
+                    ) : (
+                      <div
+                        className={cn(
+                          "inline-block rounded-2xl px-3 py-2 text-sm",
+                          isMe
+                            ? "bg-blue-500 text-white rounded-br-md"
+                            : "bg-[var(--sidebar-hover)] rounded-bl-md"
+                        )}
+                      >
+                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[9px] text-[var(--muted)]">{formatTime(msg.timestamp)}</span>
+                      {msg.type === "text" && !isMe && (
+                        <button
+                          onClick={() => handleSaveToKb(msg)}
+                          className="text-[9px] text-[var(--muted)] hover:text-amber-500 flex items-center gap-0.5"
+                          title="加入来源"
+                        >
+                          <BookmarkPlus size={9} /> 加入来源
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {isMe && (
+                    <div className="w-7 h-7 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center shrink-0 mt-0.5">
+                      <User size={14} />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+      </div>
+
+      {/* 讨论输入框 */}
+      <div className="px-4 py-3 border-t border-[var(--border)] shrink-0">
+        <div className="flex items-end gap-2">
+          <button
+            onClick={() => imageInputRef.current?.click()}
+            className="p-2 rounded-lg hover:bg-[var(--sidebar-hover)] text-[var(--muted)] transition-colors shrink-0"
+            title="发送图片"
+          >
+            <ImageIcon size={16} />
+          </button>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleImageUpload}
+          />
+          <textarea
+            value={input}
+            onChange={(e) => {
+              setInput(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
+            placeholder="发送消息..."
+            rows={1}
+            className="flex-1 px-3 py-2 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-400 resize-none max-h-[120px]"
+          />
+          <button
+            onClick={handleSend}
+            disabled={!input.trim()}
+            className="p-2 rounded-xl bg-blue-500 text-white hover:bg-blue-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 transition-colors shrink-0"
+          >
+            <Send size={16} />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

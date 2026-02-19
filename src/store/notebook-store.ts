@@ -48,6 +48,44 @@ export interface StudioType {
   generated: boolean;
 }
 
+export interface DiscussMessage {
+  id: string;
+  userId: string;
+  userName: string;
+  userIcon: string;
+  type: "text" | "image" | "file" | "system";
+  content: string;
+  timestamp: string;
+  metadata?: {
+    fileName?: string;
+    fileSize?: number;
+    fileType?: string;
+    replyTo?: string;
+  };
+}
+
+export interface ShareConfig {
+  shareId: string;
+  notebookId: string;
+  ownerId: string;
+  access: "public" | "login-required";
+  createdAt: string;
+}
+
+export interface PodcastSegment {
+  speaker: string;
+  text: string;
+  voice: string;
+}
+
+export interface PodcastData {
+  mode: "narration" | "dialogue";
+  script: string;
+  segments: PodcastSegment[];
+  voices: Record<string, string>;
+  generatedAt: string;
+}
+
 // ========== Store ==========
 interface NotebookStore {
   // 列表
@@ -61,10 +99,22 @@ interface NotebookStore {
   studioOutputs: Record<string, StudioOutput>;
   studioTypes: StudioType[];
 
+  // 讨论组
+  discussMessages: DiscussMessage[];
+  loadingDiscuss: boolean;
+
+  // 分享
+  shareConfig: ShareConfig | null;
+  memberCount: number;
+
+  // 播客
+  podcastData: PodcastData | null;
+  generatingPodcast: boolean;
+
   // UI 状态
   loadingSources: boolean;
   loadingChat: boolean;
-  generatingStudio: string | null; // 正在生成的 studio type
+  generatingStudio: string | null;
   streamingResponse: string;
   middleTab: "ai" | "discuss";
 
@@ -89,6 +139,19 @@ interface NotebookStore {
   fetchStudioOutputs: (userId: string, notebookId: string) => Promise<void>;
   generateStudio: (userId: string, notebookId: string, type: string) => Promise<void>;
 
+  // Discussion
+  fetchDiscussMessages: (userId: string, notebookId: string) => Promise<void>;
+  sendDiscussMessage: (userId: string, notebookId: string, type: string, content: string, metadata?: Record<string, unknown>) => Promise<void>;
+
+  // Share
+  fetchShareInfo: (userId: string, notebookId: string) => Promise<void>;
+  createShare: (userId: string, notebookId: string, access?: string) => Promise<string | null>;
+  revokeShare: (userId: string, notebookId: string) => Promise<void>;
+
+  // Podcast
+  fetchPodcast: (userId: string, notebookId: string) => Promise<void>;
+  generatePodcast: (userId: string, notebookId: string, mode: string, voices?: Record<string, string>) => Promise<void>;
+
   // UI
   setMiddleTab: (tab: "ai" | "discuss") => void;
 }
@@ -101,6 +164,12 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
   chatMessages: [],
   studioOutputs: {},
   studioTypes: [],
+  discussMessages: [],
+  loadingDiscuss: false,
+  shareConfig: null,
+  memberCount: 0,
+  podcastData: null,
+  generatingPodcast: false,
   loadingSources: false,
   loadingChat: false,
   generatingStudio: null,
@@ -176,6 +245,10 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
       studioOutputs: {},
       studioTypes: [],
       streamingResponse: "",
+      discussMessages: [],
+      shareConfig: null,
+      memberCount: 0,
+      podcastData: null,
     });
   },
 
@@ -324,6 +397,98 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
       }
     } catch {}
     set({ generatingStudio: null });
+  },
+
+  // ========== Discussion ==========
+  fetchDiscussMessages: async (userId, notebookId) => {
+    set({ loadingDiscuss: true });
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/discuss?userId=${userId}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        set({ discussMessages: data.messages || [] });
+      }
+    } catch {}
+    set({ loadingDiscuss: false });
+  },
+
+  sendDiscussMessage: async (userId, notebookId, type, content, metadata) => {
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/discuss`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, type, content, metadata }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        set((s) => ({ discussMessages: [...s.discussMessages, data.message] }));
+      }
+    } catch {}
+  },
+
+  // ========== Share ==========
+  fetchShareInfo: async (userId, notebookId) => {
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/share?userId=${userId}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        set({ shareConfig: data.share || null, memberCount: data.memberCount || 0 });
+      }
+    } catch {}
+  },
+
+  createShare: async (userId, notebookId, access) => {
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, access: access || "login-required" }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        set({ shareConfig: data.share });
+        return data.share?.shareId || null;
+      }
+    } catch {}
+    return null;
+  },
+
+  revokeShare: async (userId, notebookId) => {
+    try {
+      await fetch(`/api/notebook/${notebookId}/share`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      set({ shareConfig: null });
+    } catch {}
+  },
+
+  // ========== Podcast ==========
+  fetchPodcast: async (userId, notebookId) => {
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/podcast?userId=${userId}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        set({ podcastData: data.podcast || null });
+      }
+    } catch {}
+  },
+
+  generatePodcast: async (userId, notebookId, mode, voices) => {
+    set({ generatingPodcast: true });
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/podcast`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, mode, ...voices }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        set({ podcastData: data.podcast });
+      }
+    } catch {}
+    set({ generatingPodcast: false });
   },
 
   // UI
