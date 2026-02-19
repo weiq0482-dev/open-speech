@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRedis, verifyAdminKey, unauthorizedResponse, SETTINGS_KEY } from "@/lib/admin-utils";
 
-const DEFAULT_SETTINGS = { freeTrialDays: 30, freeDailyLimit: 5 };
+const DEFAULT_SETTINGS = { 
+  freeTrialDays: 30, 
+  freeDailyLimit: 5,
+  modelProvider: "gemini", // "gemini" | "qwen"
+  qwenApiKey: "",
+};
 
 export async function GET(req: NextRequest) {
   if (!verifyAdminKey(req)) return unauthorizedResponse();
