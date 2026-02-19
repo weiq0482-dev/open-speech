@@ -45,6 +45,7 @@ const SETTINGS_KEY = "system_settings";
 interface SystemSettings {
   freeTrialDays: number;
   freeDailyLimit: number;
+  modelProvider: string;
 }
 
 export async function getSystemSettingsPublic(): Promise<SystemSettings> {
@@ -58,9 +59,10 @@ async function getSystemSettings(): Promise<SystemSettings> {
     return {
       freeTrialDays: settings?.freeTrialDays || FREE_TRIAL_DAYS,
       freeDailyLimit: settings?.freeDailyLimit || FREE_DAILY_LIMIT,
+      modelProvider: (settings as any)?.modelProvider || "gemini",
     };
   } catch {
-    return { freeTrialDays: FREE_TRIAL_DAYS, freeDailyLimit: FREE_DAILY_LIMIT };
+    return { freeTrialDays: FREE_TRIAL_DAYS, freeDailyLimit: FREE_DAILY_LIMIT, modelProvider: "gemini" };
   }
 }
 

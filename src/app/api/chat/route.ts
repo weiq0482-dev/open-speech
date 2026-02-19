@@ -269,6 +269,7 @@ async function handleStreamingChat(
   options?: {
     gemSystemPrompt?: string;
     customSystemInstruction?: string;
+    knowledgeContext?: string;
     generationConfig?: {
       temperature?: number;
       topP?: number;
@@ -286,9 +287,9 @@ async function handleStreamingChat(
     options?.customSystemInstruction ||
     options?.gemSystemPrompt ||
     null;
-  const systemInstruction = rawInstruction
+  const systemInstruction = (rawInstruction
     ? SAFETY_PREFIX + rawInstruction
-    : SYSTEM_PROMPTS[tool] || SYSTEM_PROMPTS.none;
+    : SYSTEM_PROMPTS[tool] || SYSTEM_PROMPTS.none) + (options?.knowledgeContext || "");
 
   // 合并前端传来的 generationConfig
   const userConfig = options?.generationConfig;
@@ -505,8 +506,12 @@ export async function POST(req: NextRequest) {
     let apiKey = "";
     let usingOwnKey = false;
 
-    if (userApiKey && userApiKey !== "your-api-key-here") {
-      // 用户自带 Key，直接使用，不限额
+    if (modelProvider === "qwen") {
+      // 通义千问模式：强制使用平台 Key，不接受用户自带 Key
+      apiKey = qwenApiKey || "";
+      usingOwnKey = false;
+    } else if (userApiKey && userApiKey !== "your-api-key-here") {
+      // Gemini 模式：允许用户自带 4sapi Key（仍受平台控制）
       apiKey = userApiKey;
       usingOwnKey = true;
     } else {
@@ -568,6 +573,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ========== 知识库 RAG：检索相关知识注入上下文 ==========
+    let knowledgeContext = "";
+    if (validUserId && !isImageGen) {
+      try {
+        const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+        const query = lastUserMsg?.content?.slice(0, 200) || "";
+        if (query.length > 5) {
+          const kbIndexKey = `kb_index:${validUserId}`;
+          const itemIds: string[] = (await redis.lrange(kbIndexKey, 0, 49)) || [];
+          if (itemIds.length > 0) {
+            const pipeline = redis.pipeline();
+            for (const id of itemIds) {
+              pipeline.get(`kb:${validUserId}:${id}`);
+            }
+            const kbResults = await pipeline.exec() as any[];
+            // 简单关键词匹配
+            const queryWords = query.toLowerCase().split(/[\s,，。？！、]+/).filter((w: string) => w.length > 1);
+            const scored = kbResults
+              .filter((r: any) => r != null && typeof r === "object" && r.content)
+              .map((item: any) => {
+                const text = `${item.title} ${item.summary} ${(item.tags || []).join(" ")}`.toLowerCase();
+                const score = queryWords.reduce((s: number, w: string) => s + (text.includes(w) ? 1 : 0), 0);
+                return { ...item, score };
+              })
+              .filter((item: any) => item.score > 0)
+              .sort((a: any, b: any) => b.score - a.score)
+              .slice(0, 3);
+
+            if (scored.length > 0) {
+              knowledgeContext = "\n\n【用户知识库中的相关内容（请参考但不要直接复制）】\n" +
+                scored.map((item: any, i: number) =>
+                  `${i + 1}. 《${item.title}》\n${item.summary}`
+                ).join("\n\n") + "\n\n";
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("[Knowledge RAG error]", e);
+      }
+    }
+
     // 根据后台设置选择模型提供商
     let response: Response;
     
@@ -590,9 +636,9 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 构建系统提示词
+      // 构建系统提示词（注入知识库上下文）
       const rawInstruction = customSystemInstruction || gemSystemPrompt || null;
-      const systemPrompt = rawInstruction ? SAFETY_PREFIX + rawInstruction : SYSTEM_PROMPTS[tool] || SYSTEM_PROMPTS.none;
+      const systemPrompt = (rawInstruction ? SAFETY_PREFIX + rawInstruction : SYSTEM_PROMPTS[tool] || SYSTEM_PROMPTS.none) + knowledgeContext;
 
       // 调用通义千问 API
       const qwenResponse = await callQwenAPI(finalQwenKey, messages, tool, systemPrompt, userGenConfig, true);
@@ -627,6 +673,7 @@ export async function POST(req: NextRequest) {
         response = await handleStreamingChat(messages, tool, apiBase, apiKey, {
           gemSystemPrompt,
           customSystemInstruction,
+          knowledgeContext,
           generationConfig: userGenConfig,
         });
       }
@@ -636,7 +683,6 @@ export async function POST(req: NextRequest) {
     if (!usingOwnKey && validUserId && response.ok) {
       const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "unknown";
       // 异步扣减 userId + IP 两个维度 + 记录使用日志
-      const redis = getDeviceRedis();
       Promise.all([
         deductQuota(validUserId, usageType),
         deductByIp(clientIp),

@@ -6,6 +6,7 @@ import { Sidebar } from "@/components/sidebar";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessage } from "@/components/chat-message";
 import { LoginPage } from "@/components/login-page";
+import { InterestSetup } from "@/components/interest-setup";
 import { Menu, SquarePen, Sparkles, Headphones, Send, X } from "lucide-react";
 
 function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => void }) {
@@ -136,11 +137,26 @@ function ChatApp() {
     activeGemId,
     userApiKey,
     userId,
+    addGem,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeConv = getActiveConversation();
+  const [showInterestSetup, setShowInterestSetup] = useState(false);
+
+  // 检查是否需要显示兴趣选择
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/profile?userId=${encodeURIComponent(userId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.profile?.setupCompleted) {
+          setShowInterestSetup(true);
+        }
+      })
+      .catch(() => {});
+  }, [userId]);
 
   // 站点配置（二维码等，从后台动态读取）
   const [siteConfig, setSiteConfig] = useState<{
@@ -376,6 +392,35 @@ function ChatApp() {
 
         // 通知 Sidebar 刷新配额
         window.dispatchEvent(new Event("chat-message-sent"));
+
+        // 深度研究结果自动保存到知识库
+        if (activeTool === "deep-research" && fullContent && fullContent.length > 50) {
+          try {
+            const currentUserId = useChatStore.getState().userId;
+            // 从用户消息中提取标题
+            const title = content.length > 60 ? content.slice(0, 60) + "..." : content || "深度研究";
+            // 提取标签：从来源中获取关键词
+            const tags = ["深度研究"];
+            if (collectedSources.length > 0) {
+              tags.push(...collectedSources.slice(0, 3).map(s => new URL(s.url).hostname.replace("www.", "")).filter(Boolean));
+            }
+            await fetch("/api/knowledge", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                userId: currentUserId,
+                title,
+                content: fullContent,
+                summary: fullContent.slice(0, 300),
+                source: "deep-research",
+                sourceUrl: collectedSources[0]?.url,
+                tags,
+              }),
+            });
+          } catch (e) {
+            console.warn("[Knowledge auto-save error]", e);
+          }
+        }
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           // 用户主动停止，保留已生成的内容
@@ -702,6 +747,34 @@ function ChatApp() {
       {/* 右下角客服聊天小窗 */}
       {showContactChat && (
         <ContactMiniChat userId={userId} onClose={() => setShowContactChat(false)} />
+      )}
+
+      {/* 兴趣选择弹窗（新用户首次登录） */}
+      {showInterestSetup && (
+        <InterestSetup
+          userId={userId}
+          onComplete={(experts) => {
+            setShowInterestSetup(false);
+            // 将生成的专家添加到用户的 Gem 列表
+            for (const expert of experts) {
+              addGem({
+                name: expert.name,
+                icon: expert.icon,
+                description: expert.description,
+                systemPrompt: expert.systemPrompt,
+              });
+            }
+          }}
+          onSkip={() => {
+            setShowInterestSetup(false);
+            // 跳过时也标记为已完成，不再弹出
+            fetch("/api/profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ userId, interests: ["通用"], }),
+            }).catch(() => {});
+          }}
+        />
       )}
 
       {/* 推广弹窗 */}

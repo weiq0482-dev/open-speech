@@ -22,8 +22,10 @@ import {
   LogIn,
   LogOut,
   Mail,
+  BookOpen,
 } from "lucide-react";
 import { AuthDialog } from "./auth-dialog";
+import { KnowledgePanel } from "./knowledge-panel";
 
 interface ContactMsg {
   id: string;
@@ -220,7 +222,8 @@ export function Sidebar() {
   const [showNewGem, setShowNewGem] = useState(false);
   const [siteConfig, setSiteConfig] = useState<{ contactQrUrl?: string; contactWechatId?: string } | null>(null);
   const [showAuth, setShowAuth] = useState(false);
-  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; dailyFreeUsed: number; freeDailyLimit: number } | null>(null);
+  const [showKnowledge, setShowKnowledge] = useState(false);
+  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; dailyFreeUsed: number; freeDailyLimit: number; modelProvider?: string } | null>(null);
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(d => setSiteConfig(d.config)).catch(() => {});
@@ -237,6 +240,7 @@ export function Sidebar() {
           plan: data.quota.plan || "free",
           dailyFreeUsed: data.quota.dailyFreeUsed || 0,
           freeDailyLimit: data.quota.freeDailyLimit || 5,
+          modelProvider: data.quota.modelProvider || "gemini",
         });
       }
     } catch {}
@@ -282,9 +286,14 @@ export function Sidebar() {
         setSidebarKeyMsg({ ok: false, text: "网络错误" });
       }
     } else {
-      setUserApiKey(val);
-      setSidebarKeyInput("");
-      setSidebarKeyMsg({ ok: true, text: "API Key 已保存" });
+      // 千问模式下不接受 API Key，只接受兑换码
+      if (quotaInfo?.modelProvider === "qwen") {
+        setSidebarKeyMsg({ ok: false, text: "请输入兑换码格式：OS-XXXX-XXXX" });
+      } else {
+        setUserApiKey(val);
+        setSidebarKeyInput("");
+        setSidebarKeyMsg({ ok: true, text: "API Key 已保存" });
+      }
     }
     setTimeout(() => setSidebarKeyMsg(null), 4000);
   };
@@ -563,6 +572,15 @@ export function Sidebar() {
               })}
             </div>
           </div>
+          {/* 知识库入口 */}
+          <button
+            onClick={() => setShowKnowledge(true)}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm text-amber-600 dark:text-amber-400"
+          >
+            <BookOpen size={18} />
+            <span>我的知识库</span>
+          </button>
+
           <button
             onClick={toggleDarkMode}
             className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm"
@@ -579,9 +597,9 @@ export function Sidebar() {
               userApiKey ? "text-green-600 dark:text-green-400" : "text-[var(--foreground)]"
             )}
           >
-            <Key size={18} />
-            <span>Key / 兑换码</span>
-            {userApiKey && (
+            <Gift size={18} />
+            <span>{quotaInfo?.modelProvider === "qwen" ? "兑换码" : "Key / 兑换码"}</span>
+            {userApiKey && quotaInfo?.modelProvider !== "qwen" && (
               <span className="ml-auto text-[10px] text-green-600 dark:text-green-400">已配置</span>
             )}
           </button>
@@ -593,7 +611,7 @@ export function Sidebar() {
                   value={sidebarKeyInput}
                   onChange={(e) => setSidebarKeyInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleSidebarKeySubmit()}
-                  placeholder="API Key 或兑换码 (OS-XXXX-XXXX)"
+                  placeholder={quotaInfo?.modelProvider === "qwen" ? "兑换码 (OS-XXXX-XXXX)" : "API Key 或兑换码 (OS-XXXX-XXXX)"}
                   className="flex-1 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500"
                 />
                 <button
@@ -728,6 +746,11 @@ export function Sidebar() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 知识库面板 */}
+      {showKnowledge && (
+        <KnowledgePanel userId={userId} onClose={() => setShowKnowledge(false)} />
       )}
 
       {/* 邮箱登录弹窗 */}

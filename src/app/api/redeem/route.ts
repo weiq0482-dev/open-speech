@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       getUserQuota(userId),
       getSystemSettingsPublic(),
     ]);
-    return NextResponse.json({ quota: { ...quota, freeDailyLimit: settings.freeDailyLimit, freeTrialDays: settings.freeTrialDays } });
+    return NextResponse.json({ quota: { ...quota, freeDailyLimit: settings.freeDailyLimit, freeTrialDays: settings.freeTrialDays, modelProvider: settings.modelProvider } });
   } catch (err) {
     console.error("[GET /api/redeem]", err);
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
