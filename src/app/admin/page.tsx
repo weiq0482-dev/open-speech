@@ -96,13 +96,48 @@ export default function AdminPage() {
 
   useEffect(() => {
     const saved = localStorage.getItem("openspeech-admin-key");
-    if (saved) { setAdminKey(saved); setAuthed(true); }
+    if (saved) {
+      // 验证已保存的密钥是否仍然有效
+      fetch("/api/admin/users", { headers: { "x-admin-key": saved } })
+        .then((r) => {
+          if (r.ok) {
+            setAdminKey(saved);
+            setAuthed(true);
+          } else {
+            localStorage.removeItem("openspeech-admin-key");
+            setLoginError("密钥已过期，请重新输入");
+          }
+        })
+        .catch(() => {
+          // 网络错误时仍允许进入（可能离线）
+          setAdminKey(saved);
+          setAuthed(true);
+        });
+    }
   }, []);
 
-  const handleLogin = () => {
-    localStorage.setItem("openspeech-admin-key", keyInput);
-    setAdminKey(keyInput);
-    setAuthed(true);
+  const [loginError, setLoginError] = useState("");
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!keyInput.trim()) return;
+    setLoginLoading(true);
+    setLoginError("");
+    try {
+      const resp = await fetch("/api/admin/users", {
+        headers: { "x-admin-key": keyInput.trim() },
+      });
+      if (resp.ok) {
+        localStorage.setItem("openspeech-admin-key", keyInput.trim());
+        setAdminKey(keyInput.trim());
+        setAuthed(true);
+      } else {
+        setLoginError("密钥错误，请重新输入");
+      }
+    } catch {
+      setLoginError("网络连接失败，请稍后重试");
+    }
+    setLoginLoading(false);
   };
 
   const handleLogout = () => {
@@ -125,8 +160,15 @@ export default function AdminPage() {
             placeholder="输入管理密钥"
             className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-blue-500 mb-4"
           />
-          <button onClick={handleLogin} className="w-full px-4 py-3 rounded-xl bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors">
-            进入管理
+          {loginError && (
+            <p className="text-xs text-red-500 mb-3 text-center">{loginError}</p>
+          )}
+          <button
+            onClick={handleLogin}
+            disabled={loginLoading}
+            className="w-full px-4 py-3 rounded-xl bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors disabled:bg-gray-300"
+          >
+            {loginLoading ? "验证中..." : "进入管理"}
           </button>
         </div>
       </div>
@@ -314,6 +356,7 @@ function UsersTab({ adminKey }: { adminKey: string }) {
   const [suspicious, setSuspicious] = useState<UserInfo[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [filter, setFilter] = useState<"all" | "free" | "paid" | "locked" | "suspicious">("all");
   const [lockReason, setLockReason] = useState("");
   const [actionUserId, setActionUserId] = useState<string | null>(null);
@@ -326,8 +369,11 @@ function UsersTab({ adminKey }: { adminKey: string }) {
         setUsers(data.users || []);
         setSuspicious(data.suspicious || []);
         setTotal(data.total || 0);
+        setError("");
+      } else {
+        setError(`加载失败 (${resp.status})`);
       }
-    } catch { /* ignore */ }
+    } catch (e) { setError(`网络错误: ${e}`); }
     setLoading(false);
   }, [adminKey]);
 
@@ -360,6 +406,7 @@ function UsersTab({ adminKey }: { adminKey: string }) {
   });
 
   if (loading) return <div className="text-center text-gray-400 py-20">加载中...</div>;
+  if (error) return <div className="text-center text-red-500 py-20">{error}<br/><button onClick={fetchUsers} className="mt-2 text-blue-500 underline text-sm">重试</button></div>;
 
   return (
     <div className="space-y-4">
@@ -531,8 +578,11 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
 
   useEffect(() => { fetchCoupons(); }, [fetchCoupons]);
 
+  const [genError, setGenError] = useState("");
+
   const handleGenerate = async () => {
     setGenerating(true);
+    setGenError("");
     try {
       const resp = await adminFetch("/api/admin/coupons/generate", adminKey, {
         method: "POST",
@@ -540,10 +590,12 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
       });
       if (resp.ok) {
         const data = await resp.json();
-        setNewCodes(data.codes || []);
+        setNewCodes((prev) => [...data.codes, ...prev]);
         fetchCoupons();
+      } else {
+        setGenError(`生成失败 (${resp.status})`);
       }
-    } catch { /* ignore */ }
+    } catch (e) { setGenError(`网络错误: ${e}`); }
     setGenerating(false);
   };
 
@@ -583,6 +635,7 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
             {generating ? "生成中..." : "生成"}
           </button>
         </div>
+        {genError && <p className="text-xs text-red-500 mt-2">{genError}</p>}
 
         {newCodes.length > 0 && (
           <div className="mt-3 p-3 bg-green-50 rounded-lg">

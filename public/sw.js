@@ -1,6 +1,6 @@
-const CACHE_VERSION = 3;
+const CACHE_VERSION = 4;
 const CACHE_NAME = `openspeech-v${CACHE_VERSION}`;
-const PRECACHE_URLS = ["/", "/offline"];
+const PRECACHE_URLS = ["/"];
 
 // 离线回退页面 HTML
 const OFFLINE_HTML = `<!DOCTYPE html>
