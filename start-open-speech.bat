@@ -1,11 +1,11 @@
 @echo off
 chcp 65001 >nul
-title OpenSpeech - AI 助手
+title Open-Speech - AI 助手
 
 cd /d "%~dp0"
 
 echo ========================================
-echo   OpenSpeech - AI 助手
+echo   Open-Speech - AI 助手
 echo ========================================
 echo.
 
