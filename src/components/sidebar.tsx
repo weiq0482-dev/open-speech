@@ -220,10 +220,40 @@ export function Sidebar() {
   const [showNewGem, setShowNewGem] = useState(false);
   const [siteConfig, setSiteConfig] = useState<{ contactQrUrl?: string; contactWechatId?: string } | null>(null);
   const [showAuth, setShowAuth] = useState(false);
+  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; dailyFreeUsed: number; freeDailyLimit: number } | null>(null);
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(d => setSiteConfig(d.config)).catch(() => {});
   }, []);
+
+  // 获取用户配额信息
+  const fetchQuota = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const resp = await fetch(`/api/redeem?userId=${encodeURIComponent(userId)}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setQuotaInfo({
+          plan: data.quota.plan || "free",
+          dailyFreeUsed: data.quota.dailyFreeUsed || 0,
+          freeDailyLimit: data.quota.freeDailyLimit || 5,
+        });
+      }
+    } catch {}
+  }, [userId]);
+
+  useEffect(() => {
+    fetchQuota();
+  }, [fetchQuota]);
+
+  // 监听消息发送，刷新配额
+  useEffect(() => {
+    const handleMessageSent = () => {
+      setTimeout(fetchQuota, 500);
+    };
+    window.addEventListener("chat-message-sent", handleMessageSent);
+    return () => window.removeEventListener("chat-message-sent", handleMessageSent);
+  }, [fetchQuota]);
   const [newGemName, setNewGemName] = useState("");
   const [newGemIcon, setNewGemIcon] = useState("🤖");
   const [newGemDesc, setNewGemDesc] = useState("");
@@ -355,21 +385,44 @@ export function Sidebar() {
         )}
       >
         {/* Header */}
-        <div className="flex items-center gap-2 p-3 h-14">
-          <button
-            onClick={toggleSidebar}
-            className="p-2 rounded-full hover:bg-[var(--sidebar-hover)] transition-colors"
-            title="收起侧边栏"
-          >
-            <Menu size={20} />
-          </button>
-          <button
-            onClick={() => createConversation()}
-            className="p-2 rounded-full hover:bg-[var(--sidebar-hover)] transition-colors ml-auto"
-            title="新对话"
-          >
-            <SquarePen size={20} />
-          </button>
+        <div className="p-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleSidebar}
+              className="p-2 rounded-full hover:bg-[var(--sidebar-hover)] transition-colors"
+              title="收起侧边栏"
+            >
+              <Menu size={20} />
+            </button>
+            <button
+              onClick={() => createConversation()}
+              className="p-2 rounded-full hover:bg-[var(--sidebar-hover)] transition-colors ml-auto"
+              title="新对话"
+            >
+              <SquarePen size={20} />
+            </button>
+          </div>
+
+          {/* 免费用户今日剩余次数 */}
+          {quotaInfo && quotaInfo.plan === "free" && (
+            <div className="px-3 py-2 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">今日剩余</span>
+                <Zap size={14} className="text-blue-500" />
+              </div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {Math.max(0, quotaInfo.freeDailyLimit - quotaInfo.dailyFreeUsed)}
+                </span>
+                <span className="text-xs text-blue-600/70 dark:text-blue-400/70">
+                  / {quotaInfo.freeDailyLimit} 次
+                </span>
+              </div>
+              <p className="text-[10px] text-blue-600/60 dark:text-blue-400/60 mt-0.5">
+                生图消耗2次 · 每日0点重置
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Gem section */}

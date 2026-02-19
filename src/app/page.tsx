@@ -287,6 +287,8 @@ function ChatApp() {
               content: data.text || "图片已生成：",
               generatedImages: data.images || [],
             });
+            // 通知 Sidebar 刷新配额
+            window.dispatchEvent(new Event("chat-message-sent"));
           }
           setMessageStreaming(convId!, assistantMsgId, false);
           setIsGenerating(false);
@@ -371,6 +373,9 @@ function ChatApp() {
             content: "",
           });
         }
+
+        // 通知 Sidebar 刷新配额
+        window.dispatchEvent(new Event("chat-message-sent"));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
           // 用户主动停止，保留已生成的内容
