@@ -44,13 +44,26 @@ interface Coupon {
   usedAt: string | null;
 }
 
-type TabKey = "messages" | "users" | "coupons" | "settings";
+interface AdminSession {
+  username: string;
+  role: "super" | "normal";
+  permissions: string[];
+  adminKey: string; // 用于 API 鉴权
+}
+
+type TabKey = "messages" | "users" | "coupons" | "settings" | "admins";
 
 // ========== 工具函数 ==========
-function adminFetch(url: string, key: string, options?: RequestInit) {
+function adminFetch(url: string, session: AdminSession, options?: RequestInit) {
   return fetch(url, {
     ...options,
-    headers: { "x-admin-key": key, "Content-Type": "application/json", ...options?.headers },
+    headers: {
+      "x-admin-key": session.adminKey,
+      "x-admin-role": session.role,
+      "x-admin-user": session.username,
+      "Content-Type": "application/json",
+      ...options?.headers,
+    },
   });
 }
 
@@ -90,102 +103,154 @@ function planBadge(plan: string) {
 
 // ========== 主组件 ==========
 export default function AdminPage() {
-  const [authed, setAuthed] = useState(false);
-  const [keyInput, setKeyInput] = useState("");
-  const [adminKey, setAdminKey] = useState("");
+  const [session, setSession] = useState<AdminSession | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>("messages");
-
-  useEffect(() => {
-    const saved = localStorage.getItem("openspeech-admin-key");
-    if (saved) {
-      // 验证已保存的密钥是否仍然有效
-      fetch("/api/admin/users", { headers: { "x-admin-key": saved } })
-        .then((r) => {
-          if (r.ok) {
-            setAdminKey(saved);
-            setAuthed(true);
-          } else {
-            localStorage.removeItem("openspeech-admin-key");
-            setLoginError("密钥已过期，请重新输入");
-          }
-        })
-        .catch(() => {
-          // 网络错误时仍允许进入（可能离线）
-          setAdminKey(saved);
-          setAuthed(true);
-        });
-    }
-  }, []);
-
+  const [loginMode, setLoginMode] = useState<"key" | "password">("key");
+  const [keyInput, setKeyInput] = useState("");
+  const [usernameInput, setUsernameInput] = useState("");
+  const [passwordInput, setPasswordInput] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loginLoading, setLoginLoading] = useState(false);
 
+  // 恢复会话
+  useEffect(() => {
+    const saved = localStorage.getItem("openspeech-admin-session");
+    if (saved) {
+      try {
+        const s = JSON.parse(saved) as AdminSession;
+        // 验证密钥仍然有效
+        fetch("/api/admin/users", { headers: { "x-admin-key": s.adminKey } })
+          .then((r) => { if (r.ok) setSession(s); else localStorage.removeItem("openspeech-admin-session"); })
+          .catch(() => setSession(s)); // 离线时仍允许
+      } catch { localStorage.removeItem("openspeech-admin-session"); }
+    }
+  }, []);
+
   const handleLogin = async () => {
-    if (!keyInput.trim()) return;
     setLoginLoading(true);
     setLoginError("");
     try {
-      const resp = await fetch("/api/admin/users", {
-        headers: { "x-admin-key": keyInput.trim() },
-      });
-      if (resp.ok) {
-        localStorage.setItem("openspeech-admin-key", keyInput.trim());
-        setAdminKey(keyInput.trim());
-        setAuthed(true);
+      let body: Record<string, string>;
+      if (loginMode === "key") {
+        if (!keyInput.trim()) { setLoginLoading(false); return; }
+        body = { key: keyInput.trim() };
       } else {
-        setLoginError("密钥错误，请重新输入");
+        if (!usernameInput.trim() || !passwordInput) { setLoginLoading(false); return; }
+        body = { username: usernameInput.trim(), password: passwordInput };
+      }
+      const resp = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json();
+      if (resp.ok && data.success) {
+        const adminKey = loginMode === "key" ? keyInput.trim() : keyInput.trim() || process.env.NEXT_PUBLIC_ADMIN_KEY || "";
+        const s: AdminSession = {
+          username: data.admin.username,
+          role: data.admin.role,
+          permissions: data.admin.permissions,
+          adminKey: loginMode === "key" ? keyInput.trim() : keyInput.trim(),
+        };
+        // 普通管理员需要超级管理员密钥才能调用 API
+        // 改用 header 传递用户名+密码，后端统一验证
+        if (loginMode === "password") {
+          s.adminKey = `user:${usernameInput.trim()}:${passwordInput}`;
+        }
+        localStorage.setItem("openspeech-admin-session", JSON.stringify(s));
+        setSession(s);
+      } else {
+        setLoginError(data.error || "登录失败");
       }
     } catch {
-      setLoginError("网络连接失败，请稍后重试");
+      setLoginError("网络连接失败");
     }
     setLoginLoading(false);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("openspeech-admin-key");
-    setAdminKey("");
-    setAuthed(false);
+    localStorage.removeItem("openspeech-admin-session");
+    setSession(null);
+    setKeyInput("");
+    setUsernameInput("");
+    setPasswordInput("");
   };
 
-  if (!authed) {
+  if (!session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 max-w-sm w-full">
           <h1 className="text-xl font-bold mb-2 text-center">OpenSpeech</h1>
-          <p className="text-xs text-gray-400 text-center mb-6">管理后台</p>
-          <input
-            type="password"
-            value={keyInput}
-            onChange={(e) => setKeyInput(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-            placeholder="输入管理密钥"
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-blue-500 mb-4"
-          />
-          {loginError && (
-            <p className="text-xs text-red-500 mb-3 text-center">{loginError}</p>
+          <p className="text-xs text-gray-400 text-center mb-4">管理后台</p>
+
+          {/* 登录模式切换 */}
+          <div className="flex rounded-lg border border-gray-200 mb-4 overflow-hidden">
+            <button
+              onClick={() => setLoginMode("key")}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${loginMode === "key" ? "bg-blue-500 text-white" : "bg-white text-gray-500"}`}
+            >
+              超级管理员
+            </button>
+            <button
+              onClick={() => setLoginMode("password")}
+              className={`flex-1 py-2 text-xs font-medium transition-colors ${loginMode === "password" ? "bg-blue-500 text-white" : "bg-white text-gray-500"}`}
+            >
+              管理员登录
+            </button>
+          </div>
+
+          {loginMode === "key" ? (
+            <input
+              type="password"
+              value={keyInput}
+              onChange={(e) => setKeyInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+              placeholder="输入超级管理密钥"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-blue-500 mb-4"
+            />
+          ) : (
+            <div className="space-y-3 mb-4">
+              <input
+                value={usernameInput}
+                onChange={(e) => setUsernameInput(e.target.value)}
+                placeholder="用户名"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-blue-500"
+              />
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                placeholder="密码"
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-gray-50 text-sm outline-none focus:border-blue-500"
+              />
+            </div>
           )}
+
+          {loginError && <p className="text-xs text-red-500 mb-3 text-center">{loginError}</p>}
           <button
             onClick={handleLogin}
             disabled={loginLoading}
             className="w-full px-4 py-3 rounded-xl bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors disabled:bg-gray-300"
           >
-            {loginLoading ? "验证中..." : "进入管理"}
+            {loginLoading ? "验证中..." : "登录"}
           </button>
         </div>
       </div>
     );
   }
 
-  const tabs: { key: TabKey; label: string }[] = [
-    { key: "messages", label: "客服消息" },
-    { key: "users", label: "用户管理" },
-    { key: "coupons", label: "兑换码" },
-    { key: "settings", label: "系统设置" },
+  const allTabs: { key: TabKey; label: string; perm: string }[] = [
+    { key: "messages", label: "客服消息", perm: "messages" },
+    { key: "users", label: "用户管理", perm: "users" },
+    { key: "coupons", label: "兑换码", perm: "coupons" },
+    { key: "settings", label: "系统设置", perm: "settings" },
+    { key: "admins", label: "管理员", perm: "admins" },
   ];
+  const tabs = allTabs.filter((t) => session.permissions.includes(t.perm));
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* 顶部导航 */}
       <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <div className="flex items-center gap-6">
           <h1 className="text-lg font-bold">OpenSpeech 管理后台</h1>
@@ -203,24 +268,29 @@ export default function AdminPage() {
             ))}
           </nav>
         </div>
-        <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
-          退出
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-gray-400">
+            {session.username} ({session.role === "super" ? "超级管理员" : "管理员"})
+          </span>
+          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+            退出
+          </button>
+        </div>
       </header>
 
-      {/* 内容区 */}
       <div className="p-6">
-        {activeTab === "messages" && <MessagesTab adminKey={adminKey} />}
-        {activeTab === "users" && <UsersTab adminKey={adminKey} />}
-        {activeTab === "coupons" && <CouponsTab adminKey={adminKey} />}
-        {activeTab === "settings" && <SettingsTab adminKey={adminKey} />}
+        {activeTab === "messages" && <MessagesTab session={session} />}
+        {activeTab === "users" && <UsersTab session={session} />}
+        {activeTab === "coupons" && <CouponsTab session={session} />}
+        {activeTab === "settings" && <SettingsTab session={session} />}
+        {activeTab === "admins" && session.role === "super" && <AdminsTab session={session} />}
       </div>
     </div>
   );
 }
 
 // ========== 客服消息 Tab ==========
-function MessagesTab({ adminKey }: { adminKey: string }) {
+function MessagesTab({ session }: { session: AdminSession }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [activeUserId, setActiveUserId] = useState<string | null>(null);
   const [replyText, setReplyText] = useState("");
@@ -229,13 +299,13 @@ function MessagesTab({ adminKey }: { adminKey: string }) {
 
   const fetchThreads = useCallback(async () => {
     try {
-      const resp = await adminFetch("/api/admin/threads", adminKey);
+      const resp = await adminFetch("/api/admin/threads", session);
       if (resp.ok) {
         const data = await resp.json();
         setThreads(data.threads || []);
       }
     } catch { /* ignore */ }
-  }, [adminKey]);
+  }, [session]);
 
   useEffect(() => {
     fetchThreads();
@@ -251,7 +321,7 @@ function MessagesTab({ adminKey }: { adminKey: string }) {
     if (!replyText.trim() || !activeUserId || sending) return;
     setSending(true);
     try {
-      const resp = await adminFetch("/api/admin/reply", adminKey, {
+      const resp = await adminFetch("/api/admin/reply", session, {
         method: "POST",
         body: JSON.stringify({ userId: activeUserId, message: replyText.trim() }),
       });
@@ -352,7 +422,7 @@ function MessagesTab({ adminKey }: { adminKey: string }) {
 }
 
 // ========== 用户管理 Tab ==========
-function UsersTab({ adminKey }: { adminKey: string }) {
+function UsersTab({ session }: { session: AdminSession }) {
   const [users, setUsers] = useState<UserInfo[]>([]);
   const [suspicious, setSuspicious] = useState<UserInfo[]>([]);
   const [total, setTotal] = useState(0);
@@ -364,7 +434,7 @@ function UsersTab({ adminKey }: { adminKey: string }) {
 
   const fetchUsers = useCallback(async () => {
     try {
-      const resp = await adminFetch("/api/admin/users", adminKey);
+      const resp = await adminFetch("/api/admin/users", session);
       if (resp.ok) {
         const data = await resp.json();
         setUsers(data.users || []);
@@ -376,12 +446,12 @@ function UsersTab({ adminKey }: { adminKey: string }) {
       }
     } catch (e) { setError(`网络错误: ${e}`); }
     setLoading(false);
-  }, [adminKey]);
+  }, [session]);
 
   useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
   const handleLock = async (userId: string) => {
-    await adminFetch("/api/admin/users/lock", adminKey, {
+    await adminFetch("/api/admin/users/lock", session, {
       method: "POST",
       body: JSON.stringify({ userId, reason: lockReason || "管理员手动锁定" }),
     });
@@ -391,7 +461,7 @@ function UsersTab({ adminKey }: { adminKey: string }) {
   };
 
   const handleUnlock = async (userId: string) => {
-    await adminFetch("/api/admin/users/unlock", adminKey, {
+    await adminFetch("/api/admin/users/unlock", session, {
       method: "POST",
       body: JSON.stringify({ userId }),
     });
@@ -560,7 +630,7 @@ function UsersTab({ adminKey }: { adminKey: string }) {
 }
 
 // ========== 兑换码 Tab ==========
-function CouponsTab({ adminKey }: { adminKey: string }) {
+function CouponsTab({ session }: { session: AdminSession }) {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [plan, setPlan] = useState<"trial" | "monthly" | "quarterly">("trial");
   const [count, setCount] = useState(5);
@@ -569,13 +639,13 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
 
   const fetchCoupons = useCallback(async () => {
     try {
-      const resp = await adminFetch("/api/admin/coupons", adminKey);
+      const resp = await adminFetch("/api/admin/coupons", session);
       if (resp.ok) {
         const data = await resp.json();
         setCoupons(data.coupons || []);
       }
     } catch { /* ignore */ }
-  }, [adminKey]);
+  }, [session]);
 
   useEffect(() => { fetchCoupons(); }, [fetchCoupons]);
 
@@ -585,9 +655,9 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
     setGenerating(true);
     setGenError("");
     try {
-      const resp = await adminFetch("/api/admin/coupons/generate", adminKey, {
+      const resp = await adminFetch("/api/admin/coupons/generate", session, {
         method: "POST",
-        body: JSON.stringify({ plan, count, createdBy: "super_admin" }),
+        body: JSON.stringify({ plan, count, createdBy: session.username }),
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -758,25 +828,25 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
 }
 
 // ========== 系统设置 Tab ==========
-function SettingsTab({ adminKey }: { adminKey: string }) {
+function SettingsTab({ session }: { session: AdminSession }) {
   const [freeTrialDays, setFreeTrialDays] = useState(30);
   const [freeDailyLimit, setFreeDailyLimit] = useState(5);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    adminFetch("/api/admin/settings", adminKey).then((r) => r.json()).then((d) => {
+    adminFetch("/api/admin/settings", session).then((r) => r.json()).then((d) => {
       if (d.settings) {
         setFreeTrialDays(d.settings.freeTrialDays || 30);
         setFreeDailyLimit(d.settings.freeDailyLimit || 5);
       }
     }).catch(() => {});
-  }, [adminKey]);
+  }, [session]);
 
   const handleSave = async () => {
     setSaving(true);
     try {
-      await adminFetch("/api/admin/settings", adminKey, {
+      await adminFetch("/api/admin/settings", session, {
         method: "POST",
         body: JSON.stringify({ freeTrialDays, freeDailyLimit }),
       });
@@ -818,6 +888,196 @@ function SettingsTab({ adminKey }: { adminKey: string }) {
         >
           {saving ? "保存中..." : saved ? "已保存 ✓" : "保存设置"}
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ========== 管理员管理 Tab ==========
+interface AdminInfo {
+  username: string;
+  role: "super" | "normal";
+  permissions: string[];
+  createdAt: string;
+  createdBy: string;
+  lastLogin?: string;
+}
+
+function AdminsTab({ session }: { session: AdminSession }) {
+  const [admins, setAdmins] = useState<AdminInfo[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [newPerms, setNewPerms] = useState<string[]>(["coupons", "messages"]);
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  const PERM_OPTIONS = [
+    { key: "messages", label: "客服消息" },
+    { key: "users", label: "用户管理" },
+    { key: "coupons", label: "兑换码" },
+    { key: "settings", label: "系统设置" },
+  ];
+
+  const fetchAdmins = useCallback(async () => {
+    try {
+      const resp = await adminFetch("/api/admin/admins", session);
+      if (resp.ok) {
+        const data = await resp.json();
+        setAdmins(data.admins || []);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => { fetchAdmins(); }, [fetchAdmins]);
+
+  const handleCreate = async () => {
+    if (!newUsername.trim() || !newPassword) return;
+    try {
+      const resp = await adminFetch("/api/admin/admins", session, {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create",
+          username: newUsername.trim(),
+          password: newPassword,
+          permissions: newPerms,
+        }),
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        setMsg({ ok: true, text: data.message });
+        setNewUsername("");
+        setNewPassword("");
+        setShowCreate(false);
+        fetchAdmins();
+      } else {
+        setMsg({ ok: false, text: data.error });
+      }
+    } catch { setMsg({ ok: false, text: "网络错误" }); }
+    setTimeout(() => setMsg(null), 3000);
+  };
+
+  const handleDelete = async (username: string) => {
+    if (!confirm(`确定删除管理员 ${username}？`)) return;
+    try {
+      const resp = await adminFetch("/api/admin/admins", session, {
+        method: "POST",
+        body: JSON.stringify({ action: "delete", username }),
+      });
+      if (resp.ok) fetchAdmins();
+    } catch { /* ignore */ }
+  };
+
+  const togglePerm = (key: string) => {
+    setNewPerms((prev) => prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]);
+  };
+
+  if (loading) return <div className="text-center text-gray-400 py-20">加载中...</div>;
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      {msg && (
+        <div className={`p-3 rounded-lg text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+          {msg.text}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold">管理员列表</h3>
+        <button
+          onClick={() => setShowCreate(!showCreate)}
+          className="px-3 py-1.5 rounded-lg text-xs bg-blue-500 text-white hover:bg-blue-600"
+        >
+          {showCreate ? "取消" : "新建管理员"}
+        </button>
+      </div>
+
+      {showCreate && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+          <input
+            value={newUsername}
+            onChange={(e) => setNewUsername(e.target.value)}
+            placeholder="用户名（2-20位字母数字下划线）"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+          />
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            placeholder="密码（至少4位）"
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+          />
+          <div>
+            <p className="text-xs text-gray-500 mb-2">权限：</p>
+            <div className="flex flex-wrap gap-2">
+              {PERM_OPTIONS.map((p) => (
+                <button
+                  key={p.key}
+                  onClick={() => togglePerm(p.key)}
+                  className={`px-3 py-1 rounded-lg text-xs border transition-colors ${
+                    newPerms.includes(p.key)
+                      ? "bg-blue-500 text-white border-blue-500"
+                      : "bg-white text-gray-500 border-gray-200"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <button
+            onClick={handleCreate}
+            className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm hover:bg-green-600"
+          >
+            创建
+          </button>
+        </div>
+      )}
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-gray-500 text-xs">
+              <th className="text-left px-4 py-3 font-medium">用户名</th>
+              <th className="text-left px-4 py-3 font-medium">权限</th>
+              <th className="text-left px-4 py-3 font-medium">创建者</th>
+              <th className="text-left px-4 py-3 font-medium">创建时间</th>
+              <th className="text-left px-4 py-3 font-medium">最后登录</th>
+              <th className="text-left px-4 py-3 font-medium">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {admins.map((a) => (
+              <tr key={a.username} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-4 py-3 font-medium">{a.username}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {a.permissions.map((p) => (
+                      <span key={p} className="text-[10px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded">
+                        {PERM_OPTIONS.find((o) => o.key === p)?.label || p}
+                      </span>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">{a.createdBy}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{new Date(a.createdAt).toLocaleDateString("zh-CN")}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{a.lastLogin ? new Date(a.lastLogin).toLocaleString("zh-CN") : "-"}</td>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => handleDelete(a.username)}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    删除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {admins.length === 0 && (
+          <p className="text-center text-gray-400 text-sm py-8">暂无普通管理员</p>
+        )}
       </div>
     </div>
   );

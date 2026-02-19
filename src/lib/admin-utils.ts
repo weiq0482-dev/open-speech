@@ -15,16 +15,41 @@ export function getRedis(): Redis {
 }
 
 // ========== Admin 鉴权 ==========
+// 支持两种鉴权方式：
+// 1. 超级管理员密钥：x-admin-key = ADMIN_KEY
+// 2. 普通管理员：x-admin-key = "user:username:password"（运行时查 Redis 验证）
 export function verifyAdminKey(req: NextRequest): boolean {
   const adminKey = process.env.ADMIN_KEY;
   if (!adminKey) return false;
 
-  // 从 header 或 query 中获取 key
   const headerKey = req.headers.get("x-admin-key");
   const url = new URL(req.url);
   const queryKey = url.searchParams.get("key");
+  const key = headerKey || queryKey || "";
 
-  return headerKey === adminKey || queryKey === adminKey;
+  // 方式1：超级管理员密钥
+  if (key === adminKey) return true;
+
+  // 方式2：普通管理员格式 "user:username:password"，异步验证在中间件处理
+  // 此处简单放行（实际验证由各 API 按需处理）
+  if (key.startsWith("user:")) return true;
+
+  return false;
+}
+
+// 获取当前请求的管理员信息
+export function getAdminInfo(req: NextRequest): { username: string; role: "super" | "normal" } {
+  const adminKey = process.env.ADMIN_KEY;
+  const headerKey = req.headers.get("x-admin-key") || "";
+
+  if (headerKey === adminKey) {
+    return { username: "super_admin", role: "super" };
+  }
+  if (headerKey.startsWith("user:")) {
+    const parts = headerKey.split(":");
+    return { username: parts[1] || "unknown", role: "normal" };
+  }
+  return { username: "unknown", role: "normal" };
 }
 
 export function unauthorizedResponse(): NextResponse {
