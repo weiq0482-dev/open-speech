@@ -808,7 +808,7 @@ function CouponsTab({ session }: { session: AdminSession }) {
                   <td className={`px-4 py-3 text-xs font-medium ${expiry.color}`}>
                     {expiry.text}
                   </td>
-                  <td className="px-4 py-3 text-xs text-gray-500">{c.createdBy || "-"}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{c.createdBy || "超级管理员"}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{c.usedBy ? shortId(c.usedBy) : "-"}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">
                     {c.usedAt ? new Date(c.usedAt).toLocaleString("zh-CN") : "-"}
