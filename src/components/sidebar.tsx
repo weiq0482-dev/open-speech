@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useChatStore, MODE_CONFIGS, GenerationMode } from "@/store/chat-store";
+import { useChatStore } from "@/store/chat-store";
 import { cn } from "@/lib/utils";
 import {
   Menu,
@@ -198,8 +198,6 @@ export function Sidebar() {
     addGem,
     deleteGem,
     activeGemId,
-    activeMode,
-    setActiveMode,
     userApiKey,
     setUserApiKey,
     userId,
@@ -546,32 +544,6 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="p-3 border-t border-[var(--border)] space-y-1">
-          {/* Mode selector */}
-          <div className="px-1 pb-1">
-            <div className="text-[10px] font-medium text-[var(--muted)] px-2 mb-1">AI 模式</div>
-            <div className="grid grid-cols-1 gap-0.5">
-              {(Object.keys(MODE_CONFIGS) as GenerationMode[]).map((mode) => {
-                const m = MODE_CONFIGS[mode];
-                const isActive = activeMode === mode;
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => setActiveMode(mode)}
-                    className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs transition-colors",
-                      isActive
-                        ? "bg-blue-500/10 text-blue-500 font-medium"
-                        : "text-[var(--foreground)] hover:bg-[var(--sidebar-hover)]"
-                    )}
-                  >
-                    <span className="text-sm">{m.icon}</span>
-                    <span>{m.label}</span>
-                    <span className="ml-auto text-[10px] text-[var(--muted)]">{m.desc}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
           {/* 知识库入口 */}
           <button
             onClick={() => setShowKnowledge(true)}

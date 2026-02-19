@@ -21,6 +21,7 @@ import {
   FileSearch,
   Sparkles,
   Pencil,
+  BookOpen,
 } from "lucide-react";
 import { ImageEditor } from "@/components/image-editor";
 
@@ -78,7 +79,14 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
     getActiveConversation,
     activeGemId,
     getGemById,
+    userId,
   } = useChatStore();
+
+  const [showKbSearch, setShowKbSearch] = useState(false);
+  const [kbQuery, setKbQuery] = useState("");
+  const [kbResults, setKbResults] = useState<any[]>([]);
+  const [kbSearching, setKbSearching] = useState(false);
+  const kbRef = useRef<HTMLDivElement>(null);
 
   const activeConv = getActiveConversation();
   const isEmpty = !activeConv || activeConv.messages.length === 0;
@@ -97,6 +105,31 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
     const handler = (e: MouseEvent) => {
       if (toolsRef.current && !toolsRef.current.contains(e.target as Node)) {
         setShowTools(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // 知识库搜索
+  const handleKbSearch = useCallback(async (q: string) => {
+    if (!q.trim() || !userId) return;
+    setKbSearching(true);
+    try {
+      const resp = await fetch(`/api/knowledge?userId=${encodeURIComponent(userId)}&search=${encodeURIComponent(q.trim())}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        setKbResults(data.items || []);
+      }
+    } catch {}
+    setKbSearching(false);
+  }, [userId]);
+
+  // 点击外部关闭知识库搜索
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (kbRef.current && !kbRef.current.contains(e.target as Node)) {
+        setShowKbSearch(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -446,6 +479,84 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
                       </button>
                     </>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* 知识库搜索按钮 */}
+            <div ref={kbRef} className="relative">
+              <button
+                onClick={() => setShowKbSearch(!showKbSearch)}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full transition-colors text-sm",
+                  showKbSearch
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
+                    : "hover:bg-[var(--sidebar-hover)] text-amber-600 dark:text-amber-400"
+                )}
+                title="搜索我的知识库"
+              >
+                <BookOpen size={16} />
+                <span className="hidden sm:inline">知识库</span>
+              </button>
+              {showKbSearch && (
+                <div className="absolute bottom-full left-0 mb-2 w-80 rounded-xl border border-[var(--border)] bg-[var(--card)] shadow-xl z-[9999] animate-fade-in">
+                  <div className="p-3 border-b border-[var(--border)]">
+                    <div className="flex items-center gap-2">
+                      <Search size={14} className="text-[var(--muted)]" />
+                      <input
+                        type="text"
+                        value={kbQuery}
+                        onChange={(e) => setKbQuery(e.target.value)}
+                        onKeyDown={(e) => e.key === "Enter" && handleKbSearch(kbQuery)}
+                        placeholder="搜索知识库..."
+                        className="flex-1 bg-transparent text-sm outline-none"
+                        autoFocus
+                      />
+                      <button
+                        onClick={() => handleKbSearch(kbQuery)}
+                        disabled={kbSearching}
+                        className="px-2 py-1 rounded-lg bg-amber-500 text-white text-xs hover:bg-amber-600 disabled:bg-gray-300"
+                      >
+                        {kbSearching ? "搜索中" : "搜索"}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="max-h-60 overflow-y-auto">
+                    {kbResults.length > 0 ? (
+                      kbResults.map((item: any) => (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            setInput((prev) => prev + (prev ? "\n\n" : "") + `【知识库参考】${item.title}：${item.summary || item.content?.slice(0, 100)}`);
+                            setShowKbSearch(false);
+                          }}
+                          className="w-full text-left px-3 py-2.5 hover:bg-[var(--sidebar-hover)] transition-colors border-b border-[var(--border)] last:border-0"
+                        >
+                          <div className="text-sm font-medium truncate">{item.title}</div>
+                          <div className="text-xs text-[var(--muted)] line-clamp-2 mt-0.5">
+                            {item.summary || item.content?.slice(0, 80)}
+                          </div>
+                          {item.tags?.length > 0 && (
+                            <div className="flex gap-1 mt-1">
+                              {item.tags.slice(0, 3).map((tag: string) => (
+                                <span key={tag} className="text-[10px] px-1.5 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </button>
+                      ))
+                    ) : kbQuery && !kbSearching ? (
+                      <div className="text-center py-6 text-xs text-[var(--muted)]">
+                        未找到相关知识
+                      </div>
+                    ) : (
+                      <div className="text-center py-6 text-xs text-[var(--muted)]">
+                        输入关键词搜索你的知识库
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

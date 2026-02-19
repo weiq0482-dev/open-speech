@@ -76,6 +76,21 @@ export async function POST(req: NextRequest) {
 
     await redis.set(`${PROFILE_PREFIX}${userId}`, profile);
 
+    // 根据兴趣预设知识库分类标签
+    try {
+      const kbTagsKey = `kb_tags:${userId}`;
+      const defaultTags = [...allInterests];
+      if (hasCustom) {
+        customInterests.split(/[,，、\s]+/).filter((t: string) => t.trim()).forEach((t: string) => {
+          if (!defaultTags.includes(t.trim())) defaultTags.push(t.trim());
+        });
+      }
+      if (hasProfession) defaultTags.push(profession.trim());
+      // 加上通用标签
+      defaultTags.push("AI对话", "深度研究");
+      await redis.set(kbTagsKey, defaultTags.slice(0, 20));
+    } catch {}
+
     // 先用预设模板生成基础专家
     let recommendedExperts = generateExpertsForInterests(allInterests, profession, researchDirection);
 
@@ -137,26 +152,28 @@ async function generateExpertsWithAI(
   if (researchDirection) parts.push(`研究/关注方向：${researchDirection}`);
   const userProfile = parts.join("\n");
 
-  const prompt = `你是一个 AI 专家团队生成器。根据用户的兴趣和职业信息，生成 3~5 位专属 AI 专家。
+  const prompt = `你是一个 AI 专家团队生成器。请根据用户填写的兴趣和职业信息，为用户量身定制 3~5 位 AI 专家。
 
-用户信息：
+【用户信息】
 ${userProfile}
 
-请严格按以下 JSON 格式返回（不要返回其他内容）：
+【核心规则 - 必须遵守】
+1. 每个专家必须直接对应用户填写的某个具体兴趣/职业关键词，禁止生成"通用助手"、"编码助手"等泛泛而谈的专家
+2. 专家名称必须体现具体领域，例如：
+   - 用户写"建筑设计" → 应生成"建筑设计师"而非"设计顾问"
+   - 用户写"养花" → 应生成"园艺专家"而非"生活达人"
+   - 用户写"思想实验" → 应生成"哲学思辨家"而非"学习导师"
+3. systemPrompt 必须包含该领域的专业术语和具体场景
+
+请严格按以下 JSON 格式返回（不要返回任何其他内容，不要代码块标记）：
 [
   {
-    "name": "专家名称（2-5个字）",
-    "icon": "一个合适的 emoji",
-    "description": "一句话描述这个专家的能力（15字以内）",
-    "systemPrompt": "详细的系统提示词（100-200字），描述这个专家的身份、专业领域、回答风格和特长。要结合用户的具体领域，提示词要非常具体和专业。"
+    "name": "专家名称（2-5个字，体现具体领域）",
+    "icon": "一个贴切的 emoji",
+    "description": "一句话说明能力（15字内，要具体）",
+    "systemPrompt": "详细的系统提示词（150-250字）。必须包含：①你的专业身份 ②擅长的具体领域和场景 ③回答风格 ④会用到的专业知识举例。提示词要非常具体，像真正的行业专家一样。"
   }
-]
-
-要求：
-1. 专家要高度贴合用户的实际需求，不要太泛
-2. 每个专家的 systemPrompt 必须详细、专业、有针对性
-3. 专家之间要有差异化，覆盖用户不同维度的需求
-4. 返回纯 JSON 数组，不要 markdown 代码块`;
+]`;
 
   let responseText = "";
 

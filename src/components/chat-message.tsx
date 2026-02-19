@@ -23,7 +23,9 @@ import {
   ExternalLink,
   Download,
   Pencil,
+  BookmarkPlus,
 } from "lucide-react";
+import { useChatStore } from "@/store/chat-store";
 
 interface ChatMessageProps {
   message: Message;
@@ -31,6 +33,51 @@ interface ChatMessageProps {
   onRegenerate?: () => void;
   onRegenerateImage?: (messageId: string) => void;
   onEditImage?: (annotatedImageDataUrl: string, instruction: string) => void;
+}
+
+// 「加入知识库」按钮组件
+function SaveToKnowledgeButton({ content }: { content: string }) {
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const { userId } = useChatStore();
+
+  if (!content || content.length < 20) return null;
+
+  const handleSave = async () => {
+    if (saving || saved) return;
+    setSaving(true);
+    try {
+      // 自动提取标题（取前30字）
+      const title = content.slice(0, 30).replace(/[#*\n]/g, "").trim() + (content.length > 30 ? "..." : "");
+      const resp = await fetch("/api/knowledge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId,
+          title,
+          content: content.slice(0, 5000),
+          tags: ["AI对话"],
+        }),
+      });
+      if (resp.ok) setSaved(true);
+    } catch {}
+    setSaving(false);
+  };
+
+  return (
+    <button
+      onClick={handleSave}
+      className={cn(
+        "p-1.5 rounded-lg transition-colors",
+        saved
+          ? "text-amber-500 bg-amber-50 dark:bg-amber-900/20"
+          : "text-[var(--muted)] hover:bg-[var(--sidebar-hover)]"
+      )}
+      title={saved ? "已加入知识库" : "加入知识库"}
+    >
+      <BookmarkPlus size={14} />
+    </button>
+  );
 }
 
 function TypingIndicator() {
@@ -415,6 +462,7 @@ export const ChatMessage = memo(function ChatMessage({
             >
               <Share2 size={14} />
             </button>
+            <SaveToKnowledgeButton content={message.content} />
           </div>
         )}
       </div>

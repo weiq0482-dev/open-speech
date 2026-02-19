@@ -221,12 +221,14 @@ export function KnowledgePanel({
               加载中...
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-[var(--muted)]">
-              <BookOpen size={40} className="mb-3 opacity-30" />
-              <p className="text-sm">知识库为空</p>
-              <p className="text-xs mt-1">
-                使用「深度研究」搜索后会自动保存知识，或手动添加
-              </p>
+            <div className="flex flex-col items-center justify-center py-10 text-[var(--muted)]">
+              <BookOpen size={36} className="mb-3 opacity-30" />
+              <p className="text-sm font-medium mb-2">你的知识库正在等待第一条知识</p>
+              <div className="text-xs space-y-1.5 text-center max-w-xs">
+                <p>📚 <strong>自动收集</strong>：使用「深度研究」后自动保存</p>
+                <p>💬 <strong>对话收藏</strong>：AI 回复下方点击 <span className="inline-flex items-center px-1 py-0.5 rounded bg-amber-50 dark:bg-amber-900/20 text-amber-600 text-[10px]">📑 加入知识库</span></p>
+                <p>🔍 <strong>智能检索</strong>：输入框旁「知识库」按钮随时搜索</p>
+              </div>
             </div>
           ) : (
             items.map((item) => {
