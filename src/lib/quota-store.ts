@@ -286,6 +286,10 @@ export async function generateCoupons(
     codes.push(code);
   }
 
+  // 写入兑换码索引（供后台列表查询）
+  const existing = (await redis.get<string[]>("all_coupons")) || [];
+  await redis.set("all_coupons", [...existing, ...codes]);
+
   return codes;
 }
 

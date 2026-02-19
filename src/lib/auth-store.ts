@@ -130,6 +130,11 @@ export async function verifyCode(
       existingAccount.deviceIds.push(currentDeviceUserId);
     }
     await redis.set(accountKey, existingAccount);
+    // 补写账户索引（兼容旧用户）
+    const allEmails = (await redis.get<string[]>("all_accounts")) || [];
+    if (!allEmails.includes(normalizedEmail)) {
+      await redis.set("all_accounts", [...allEmails, normalizedEmail]);
+    }
   } else {
     // 新账户 → 注册
     isNew = true;
@@ -145,6 +150,11 @@ export async function verifyCode(
     await redis.set(`${EMAIL_USERID_PREFIX}${normalizedEmail}`, emailUserId);
     // 注册标记（供 chat API 验证）
     await redis.set(`registered:${emailUserId}`, "1");
+    // 写入账户索引（供后台用户管理查询）
+    const allEmails = (await redis.get<string[]>("all_accounts")) || [];
+    if (!allEmails.includes(normalizedEmail)) {
+      await redis.set("all_accounts", [...allEmails, normalizedEmail]);
+    }
 
     // 迁移设备指纹的配额数据到邮箱账户
     if (currentDeviceUserId) {

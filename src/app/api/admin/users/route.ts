@@ -74,6 +74,48 @@ export async function GET(req: NextRequest) {
       } catch { /* skip */ }
     }
 
+    // 3. 从邮箱账户索引补充用户
+    const allEmails = (await redis.get<string[]>("all_accounts")) || [];
+    for (const email of allEmails) {
+      try {
+        const account = await redis.get<Record<string, unknown>>(`${ACCOUNT_PREFIX}${email}`);
+        if (account && account.userId && !userMap.has(account.userId as string)) {
+          const uid = account.userId as string;
+          const quota = await redis.get<Record<string, unknown>>(`${QUOTA_PREFIX}${uid}`);
+          const locked = await redis.get<string>(`locked:${uid}`);
+          userMap.set(uid, {
+            userId: uid,
+            email: email,
+            plan: quota ? ((quota.plan as string) || "free") : "free",
+            chatRemaining: quota ? ((quota.chatRemaining as number) || 0) : 0,
+            imageRemaining: quota ? ((quota.imageRemaining as number) || 0) : 0,
+            dailyFreeUsed: quota ? ((quota.dailyFreeUsed as number) || 0) : 0,
+            dailyFreeDate: quota ? ((quota.dailyFreeDate as string) || "") : "",
+            freeTrialStarted: quota ? ((quota.freeTrialStarted as string) || "") : "",
+            redeemCode: quota ? ((quota.redeemCode as string) || null) : null,
+            locked: locked || null,
+            createdAt: (account.createdAt as string) || undefined,
+            lastLogin: (account.lastLogin as string) || undefined,
+          });
+        }
+      } catch { /* skip */ }
+    }
+
+    // 为已有的邮箱用户补充 email 字段
+    for (const email of allEmails) {
+      try {
+        const account = await redis.get<Record<string, unknown>>(`${ACCOUNT_PREFIX}${email}`);
+        if (account?.userId) {
+          const user = userMap.get(account.userId as string);
+          if (user && !user.email) {
+            user.email = email;
+            user.createdAt = (account.createdAt as string) || user.createdAt;
+            user.lastLogin = (account.lastLogin as string) || user.lastLogin;
+          }
+        }
+      } catch { /* skip */ }
+    }
+
     const users = Array.from(userMap.values());
     // 按最近活跃排序
     users.sort((a, b) => {

@@ -29,6 +29,8 @@ interface UserInfo {
   freeTrialStarted: string;
   redeemCode: string | null;
   locked: string | null;
+  createdAt?: string;
+  lastLogin?: string;
 }
 
 interface Coupon {
@@ -36,6 +38,7 @@ interface Coupon {
   plan: string;
   planLabel: string;
   createdAt: string;
+  expiresAt: string | null;
   usedBy: string | null;
   usedAt: string | null;
 }
@@ -52,6 +55,19 @@ function adminFetch(url: string, key: string, options?: RequestInit) {
 
 function shortId(id: string) {
   return id.length > 12 ? id.slice(0, 8) + "..." : id;
+}
+
+function expiryCountdown(expiresAt: string | null): { text: string; color: string } {
+  if (!expiresAt) return { text: "-", color: "text-gray-400" };
+  const now = Date.now();
+  const exp = new Date(expiresAt).getTime();
+  const diff = exp - now;
+  if (diff <= 0) return { text: "已过期", color: "text-red-500" };
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  if (days > 0) return { text: `${days}天${hours}小时`, color: days <= 7 ? "text-amber-600" : "text-green-600" };
+  const mins = Math.floor((diff % 3600000) / 60000);
+  return { text: `${hours}小时${mins}分`, color: "text-red-500" };
 }
 
 function planBadge(plan: string) {
@@ -398,11 +414,11 @@ function UsersTab({ adminKey }: { adminKey: string }) {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 text-gray-500 text-xs">
-              <th className="text-left px-4 py-3 font-medium">用户 ID</th>
+              <th className="text-left px-4 py-3 font-medium">用户</th>
               <th className="text-left px-4 py-3 font-medium">套餐</th>
-              <th className="text-left px-4 py-3 font-medium">对话剩余</th>
-              <th className="text-left px-4 py-3 font-medium">生图剩余</th>
+              <th className="text-left px-4 py-3 font-medium">对话/生图</th>
               <th className="text-left px-4 py-3 font-medium">今日用量</th>
+              <th className="text-left px-4 py-3 font-medium">兑换码</th>
               <th className="text-left px-4 py-3 font-medium">注册时间</th>
               <th className="text-left px-4 py-3 font-medium">状态</th>
               <th className="text-left px-4 py-3 font-medium">操作</th>
@@ -412,23 +428,35 @@ function UsersTab({ adminKey }: { adminKey: string }) {
             {filteredUsers.map((user) => (
               <tr key={user.userId} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-xs">{shortId(user.userId)}</span>
-                    {user.userId.startsWith("em_") && (
-                      <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded">邮箱</span>
+                  <div className="flex flex-col gap-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs">{shortId(user.userId)}</span>
+                      {user.userId.startsWith("em_") && (
+                        <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded">邮箱</span>
+                      )}
+                    </div>
+                    {user.email && (
+                      <span className="text-[10px] text-gray-400">{user.email}</span>
                     )}
                   </div>
                 </td>
                 <td className="px-4 py-3">{planBadge(user.plan)}</td>
-                <td className="px-4 py-3 text-xs">{user.plan === "free" ? "-" : user.chatRemaining}</td>
-                <td className="px-4 py-3 text-xs">{user.plan === "free" ? "-" : user.imageRemaining}</td>
+                <td className="px-4 py-3 text-xs">
+                  {user.plan === "free" ? "-" : `${user.chatRemaining} / ${user.imageRemaining}`}
+                </td>
                 <td className="px-4 py-3 text-xs">
                   <span className={user.dailyFreeUsed >= 4 ? "text-red-500 font-semibold" : ""}>
                     {user.dailyFreeUsed}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500">
-                  {user.freeTrialStarted ? new Date(user.freeTrialStarted).toLocaleDateString("zh-CN") : "-"}
+                  {user.redeemCode ? (
+                    <span className="font-mono text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{user.redeemCode}</span>
+                  ) : "-"}
+                </td>
+                <td className="px-4 py-3 text-xs text-gray-500">
+                  {user.createdAt ? new Date(user.createdAt).toLocaleDateString("zh-CN") :
+                   user.freeTrialStarted ? new Date(user.freeTrialStarted).toLocaleDateString("zh-CN") : "-"}
                 </td>
                 <td className="px-4 py-3">
                   {user.locked ? (
@@ -600,28 +628,54 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
               <th className="text-left px-4 py-3 font-medium">兑换码</th>
               <th className="text-left px-4 py-3 font-medium">套餐</th>
               <th className="text-left px-4 py-3 font-medium">状态</th>
+              <th className="text-left px-4 py-3 font-medium">有效期剩余</th>
               <th className="text-left px-4 py-3 font-medium">使用者</th>
+              <th className="text-left px-4 py-3 font-medium">使用时间</th>
               <th className="text-left px-4 py-3 font-medium">创建时间</th>
             </tr>
           </thead>
           <tbody>
-            {coupons.slice(0, 100).map((c) => (
-              <tr key={c.code} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-3 font-mono text-xs font-bold">{c.code}</td>
-                <td className="px-4 py-3">{planBadge(c.plan)}</td>
-                <td className="px-4 py-3">
-                  {c.usedBy ? (
-                    <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded">已使用</span>
-                  ) : (
-                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded">可用</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-xs text-gray-500">{c.usedBy ? shortId(c.usedBy) : "-"}</td>
-                <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.createdAt).toLocaleDateString("zh-CN")}</td>
-              </tr>
-            ))}
+            {coupons.slice(0, 200).map((c) => {
+              const expiry = c.usedBy ? { text: "-", color: "text-gray-400" } : expiryCountdown(c.expiresAt);
+              return (
+                <tr key={c.code} className="border-t border-gray-100 hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs font-bold">{c.code}</span>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(c.code)}
+                        className="text-[10px] text-gray-400 hover:text-blue-500"
+                      >
+                        复制
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">{planBadge(c.plan)}</td>
+                  <td className="px-4 py-3">
+                    {c.usedBy ? (
+                      <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded">已使用</span>
+                    ) : expiry.text === "已过期" ? (
+                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-0.5 rounded">已过期</span>
+                    ) : (
+                      <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded">可用</span>
+                    )}
+                  </td>
+                  <td className={`px-4 py-3 text-xs font-medium ${expiry.color}`}>
+                    {expiry.text}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{c.usedBy ? shortId(c.usedBy) : "-"}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">
+                    {c.usedAt ? new Date(c.usedAt).toLocaleString("zh-CN") : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{new Date(c.createdAt).toLocaleDateString("zh-CN")}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
+        {coupons.length === 0 && (
+          <p className="text-center text-gray-400 text-sm py-8">暂无兑换码</p>
+        )}
       </div>
     </div>
   );
