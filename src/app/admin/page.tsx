@@ -831,6 +831,8 @@ function CouponsTab({ session }: { session: AdminSession }) {
 function SettingsTab({ session }: { session: AdminSession }) {
   const [freeTrialDays, setFreeTrialDays] = useState(30);
   const [freeDailyLimit, setFreeDailyLimit] = useState(5);
+  const [modelProvider, setModelProvider] = useState<"gemini" | "qwen">("gemini");
+  const [qwenApiKey, setQwenApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -839,6 +841,8 @@ function SettingsTab({ session }: { session: AdminSession }) {
       if (d.settings) {
         setFreeTrialDays(d.settings.freeTrialDays || 30);
         setFreeDailyLimit(d.settings.freeDailyLimit || 5);
+        setModelProvider(d.settings.modelProvider || "gemini");
+        setQwenApiKey(d.settings.qwenApiKey || "");
       }
     }).catch(() => {});
   }, [session]);
@@ -848,7 +852,7 @@ function SettingsTab({ session }: { session: AdminSession }) {
     try {
       await adminFetch("/api/admin/settings", session, {
         method: "POST",
-        body: JSON.stringify({ freeTrialDays, freeDailyLimit }),
+        body: JSON.stringify({ freeTrialDays, freeDailyLimit, modelProvider, qwenApiKey }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -857,7 +861,57 @@ function SettingsTab({ session }: { session: AdminSession }) {
   };
 
   return (
-    <div className="max-w-lg">
+    <div className="max-w-2xl space-y-4">
+      {/* 模型提供商配置 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <h3 className="text-sm font-semibold">AI 模型配置</h3>
+
+        <div>
+          <label className="text-xs text-gray-500 mb-2 block">模型提供商</label>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setModelProvider("gemini")}
+              className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
+                modelProvider === "gemini"
+                  ? "border-blue-500 bg-blue-50 text-blue-700"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className="font-medium text-sm">Google Gemini</div>
+              <div className="text-xs text-gray-500 mt-0.5">国际版（需科学上网）</div>
+            </button>
+            <button
+              onClick={() => setModelProvider("qwen")}
+              className={`flex-1 px-4 py-3 rounded-xl border-2 transition-all ${
+                modelProvider === "qwen"
+                  ? "border-green-500 bg-green-50 text-green-700"
+                  : "border-gray-200 hover:border-gray-300"
+              }`}
+            >
+              <div className="font-medium text-sm">通义千问</div>
+              <div className="text-xs text-gray-500 mt-0.5">国内合规（阿里云）</div>
+            </button>
+          </div>
+        </div>
+
+        {modelProvider === "qwen" && (
+          <div className="animate-fade-in">
+            <label className="text-xs text-gray-500 mb-1 block">通义千问 API Key</label>
+            <input
+              type="password"
+              value={qwenApiKey}
+              onChange={(e) => setQwenApiKey(e.target.value)}
+              placeholder="sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-green-500 font-mono"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              在 <a href="https://dashscope.console.aliyun.com/apiKey" target="_blank" className="text-blue-500 hover:underline">阿里云控制台</a> 获取 API Key
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* 免费用户配置 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <h3 className="text-sm font-semibold">免费用户配置</h3>
 
@@ -880,15 +934,15 @@ function SettingsTab({ session }: { session: AdminSession }) {
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
           />
         </div>
-
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="px-6 py-2.5 rounded-xl bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
-        >
-          {saving ? "保存中..." : saved ? "已保存 ✓" : "保存设置"}
-        </button>
       </div>
+
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="px-6 py-2.5 rounded-xl bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
+      >
+        {saving ? "保存中..." : saved ? "已保存 ✓" : "保存所有设置"}
+      </button>
     </div>
   );
 }

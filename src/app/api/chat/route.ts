@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { canUse, deductQuota, canUseByIp, deductByIp } from "@/lib/quota-store";
 import { Redis } from "@upstash/redis";
+import { callQwenAPI, transformQwenStream, qwenImageGenNotSupported } from "@/lib/qwen-adapter";
 
 // 验证 userId 是否为已注册设备
 let _deviceRedis: Redis | null = null;
@@ -459,6 +460,12 @@ async function handleStreamingChat(
 // ========== Main Handler ==========
 export async function POST(req: NextRequest) {
   try {
+    // 读取后台设置（模型提供商）
+    const redis = getDeviceRedis();
+    const settings = await redis.get<{ modelProvider?: string; qwenApiKey?: string }>("system:settings") || {};
+    const modelProvider = settings.modelProvider || "gemini";
+    const qwenApiKey = settings.qwenApiKey || "";
+
     const rawBody = await req.text();
     // 请求体大小校验（限制 20MB，防止超大 base64 图片导致 OOM）
     if (rawBody.length > 20 * 1024 * 1024) {
@@ -561,16 +568,68 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 图片生成使用非流式端点 + 图片模型
+    // 根据后台设置选择模型提供商
     let response: Response;
-    if (isImageGen) {
-      response = await handleImageGen(messages, apiBase, apiKey);
-    } else {
-      response = await handleStreamingChat(messages, tool, apiBase, apiKey, {
-        gemSystemPrompt,
-        customSystemInstruction,
-        generationConfig: userGenConfig,
+    
+    if (modelProvider === "qwen") {
+      // 通义千问模式
+      if (isImageGen) {
+        // 通义千问不支持图片生成
+        return new Response(
+          JSON.stringify({ error: qwenImageGenNotSupported() }),
+          { status: 400, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      
+      // 使用通义千问 API Key（优先后台配置，其次用户自带）
+      const finalQwenKey = usingOwnKey ? apiKey : qwenApiKey;
+      if (!finalQwenKey) {
+        return new Response(
+          JSON.stringify({ error: "通义千问 API Key 未配置，请在后台设置中配置" }),
+          { status: 401, headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // 构建系统提示词
+      const rawInstruction = customSystemInstruction || gemSystemPrompt || null;
+      const systemPrompt = rawInstruction ? SAFETY_PREFIX + rawInstruction : SYSTEM_PROMPTS[tool] || SYSTEM_PROMPTS.none;
+
+      // 调用通义千问 API
+      const qwenResponse = await callQwenAPI(finalQwenKey, messages, tool, systemPrompt, userGenConfig, true);
+      
+      // 转换流式响应为 Gemini SSE 格式
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of transformQwenStream(qwenResponse)) {
+              controller.enqueue(new TextEncoder().encode(chunk));
+            }
+          } catch (e) {
+            console.error("[Qwen stream error]", e);
+          } finally {
+            controller.close();
+          }
+        },
       });
+
+      response = new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    } else {
+      // Gemini 模式（默认）
+      if (isImageGen) {
+        response = await handleImageGen(messages, apiBase, apiKey);
+      } else {
+        response = await handleStreamingChat(messages, tool, apiBase, apiKey, {
+          gemSystemPrompt,
+          customSystemInstruction,
+          generationConfig: userGenConfig,
+        });
+      }
     }
 
     // 请求成功后扣减配额（仅平台 Key 用户）
