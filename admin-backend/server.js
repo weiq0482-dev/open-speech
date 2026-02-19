@@ -153,7 +153,7 @@ app.post("/api/mark-read", async (req, res) => {
 
 // ========== 系统设置 ==========
 const SETTINGS_KEY = "system_settings";
-const DEFAULT_SETTINGS = { freeTrialDays: 30, freeDailyLimit: 5 };
+const DEFAULT_SETTINGS = { freeTrialDays: 30, freeDailyLimit: 5, shareRewardChat: 29, shareRewardImage: 9, rewardDailyLimit: 10 };
 
 app.get("/api/settings", async (req, res) => {
   try {

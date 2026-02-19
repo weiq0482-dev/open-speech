@@ -329,6 +329,14 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
       });
 
       if (!resp.ok || !resp.body) {
+        // 额度不足时显示错误提示
+        try {
+          const errData = await resp.json();
+          if (errData.quotaExhausted || resp.status === 429) {
+            const errMsg: ChatMessage = { role: "model", content: `⚠️ ${errData.error || "额度不足，请兑换体验卡或购买套餐"}`, timestamp: new Date().toISOString() };
+            set((s) => ({ chatMessages: [...s.chatMessages, errMsg] }));
+          }
+        } catch {}
         set({ loadingChat: false });
         return;
       }
@@ -394,6 +402,13 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
           studioOutputs: { ...s.studioOutputs, [type]: data.output },
           studioTypes: s.studioTypes.map((t) => (t.key === type ? { ...t, generated: true } : t)),
         }));
+      } else if (resp.status === 429) {
+        try {
+          const errData = await resp.json();
+          alert(errData.error || "额度不足，请兑换体验卡或购买套餐");
+        } catch {
+          alert("额度不足，请兑换体验卡或购买套餐");
+        }
       }
     } catch {}
     set({ generatingStudio: null });

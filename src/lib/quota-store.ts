@@ -2,7 +2,7 @@ import { Redis } from "@upstash/redis";
 
 // ========== 类型定义 ==========
 export interface CouponData {
-  plan: "trial" | "monthly" | "quarterly";
+  plan: string;
   chatQuota: number;
   imageQuota: number;
   durationDays: number;
@@ -15,7 +15,7 @@ export interface CouponData {
 }
 
 export interface UserQuota {
-  plan: "free" | "trial" | "monthly" | "quarterly";
+  plan: string; // "free" | 动态卡种 ID
   chatRemaining: number;
   imageRemaining: number;
   expiresAt: string | null;
@@ -25,14 +25,53 @@ export interface UserQuota {
   dailyFreeDate: string;
   // 免费试用期开始时间（首次使用时记录）
   freeTrialStarted?: string;
+  // 付费套餐每日消耗计数
+  rewardDailyUsed?: number;
+  rewardDailyDate?: string;
 }
 
-// ========== 套餐配置 ==========
-export const PLAN_CONFIG = {
+// ========== 动态卡种配置 ==========
+export interface PlanConfig {
+  id: string;           // 卡种ID，如 "trial", "monthly", "yearly3"
+  label: string;        // 显示名，如 "体验卡（7天）"
+  chatQuota: number;    // 对话次数
+  imageQuota: number;   // 生图次数
+  durationDays: number; // 有效天数
+  dailyLimit: number;   // 每日使用上限
+  rank: number;         // 套餐优先级（高的不会被低的覆盖）
+  color?: string;       // 徽章颜色
+}
+
+const PLANS_KEY = "system_plans";
+
+// 默认卡种（兼容旧数据）
+const DEFAULT_PLANS: PlanConfig[] = [
+  { id: "trial",     label: "体验卡（7天）",  chatQuota: 50,   imageQuota: 10,  durationDays: 7,   dailyLimit: 10, rank: 1, color: "blue" },
+  { id: "monthly",   label: "月卡（30天）",  chatQuota: 500,  imageQuota: 50,  durationDays: 30,  dailyLimit: 30, rank: 2, color: "amber" },
+  { id: "quarterly", label: "季卡（90天）",  chatQuota: 2000, imageQuota: 200, durationDays: 90,  dailyLimit: 50, rank: 3, color: "purple" },
+];
+
+// 兼容旧代码的静态配置（只做导出兼容，实际逻辑用 getPlans）
+export const PLAN_CONFIG: Record<string, { chatQuota: number; imageQuota: number; durationDays: number; label: string }> = {
   trial:     { chatQuota: 50,   imageQuota: 10,  durationDays: 7,  label: "体验卡（7天）" },
   monthly:   { chatQuota: 500,  imageQuota: 50,  durationDays: 30, label: "月卡（30天）" },
   quarterly: { chatQuota: 2000, imageQuota: 200, durationDays: 90, label: "季卡（90天）" },
 };
+
+export async function getPlans(): Promise<PlanConfig[]> {
+  try {
+    const redis = getRedis();
+    const plans = await redis.get<PlanConfig[]>(PLANS_KEY);
+    return (plans && plans.length > 0) ? plans : DEFAULT_PLANS;
+  } catch {
+    return DEFAULT_PLANS;
+  }
+}
+
+export async function savePlans(plans: PlanConfig[]): Promise<void> {
+  const redis = getRedis();
+  await redis.set(PLANS_KEY, plans);
+}
 
 export const FREE_DAILY_LIMIT = 5;
 export const FREE_TRIAL_DAYS = 30;
@@ -46,6 +85,8 @@ interface SystemSettings {
   freeTrialDays: number;
   freeDailyLimit: number;
   modelProvider: string;
+  shareRewardChat: number;
+  shareRewardImage: number;
 }
 
 export async function getSystemSettingsPublic(): Promise<SystemSettings> {
@@ -60,9 +101,11 @@ async function getSystemSettings(): Promise<SystemSettings> {
       freeTrialDays: settings?.freeTrialDays || FREE_TRIAL_DAYS,
       freeDailyLimit: settings?.freeDailyLimit || FREE_DAILY_LIMIT,
       modelProvider: (settings as any)?.modelProvider || "gemini",
+      shareRewardChat: (settings as any)?.shareRewardChat || 29,
+      shareRewardImage: (settings as any)?.shareRewardImage || 9,
     };
   } catch {
-    return { freeTrialDays: FREE_TRIAL_DAYS, freeDailyLimit: FREE_DAILY_LIMIT, modelProvider: "gemini" };
+    return { freeTrialDays: FREE_TRIAL_DAYS, freeDailyLimit: FREE_DAILY_LIMIT, modelProvider: "gemini", shareRewardChat: 29, shareRewardImage: 9 };
   }
 }
 
@@ -125,11 +168,22 @@ export async function canUse(userId: string, type: "chat" | "image"): Promise<{ 
   const quota = await getUserQuota(userId);
   const today = new Date().toISOString().slice(0, 10);
 
-  // 付费用户检查
+  // 付费/体验用户检查
   if (quota.plan !== "free") {
-    if (type === "chat" && quota.chatRemaining > 0) return { allowed: true, quota };
-    if (type === "image" && quota.imageRemaining > 0) return { allowed: true, quota };
-    return { allowed: false, reason: "套餐额度已用完，请续费", quota };
+    if (type === "chat" && quota.chatRemaining <= 0) return { allowed: false, reason: "套餐额度已用完，请续费", quota };
+    if (type === "image" && quota.imageRemaining <= 0) return { allowed: false, reason: "套餐额度已用完，请续费", quota };
+
+    // 所有付费套餐：每日消耗上限（从卡种配置读取）
+    const plans = await getPlans();
+    const planConfig = plans.find(p => p.id === quota.plan);
+    const dailyLimit = planConfig?.dailyLimit || 999;
+    const rewardDate = quota.rewardDailyDate || "";
+    const rewardUsed = (rewardDate === today) ? (quota.rewardDailyUsed || 0) : 0;
+    if (rewardUsed >= dailyLimit) {
+      return { allowed: false, reason: `今日额度已达上限（${dailyLimit}次/天），明天再来吧`, quota };
+    }
+
+    return { allowed: true, quota };
   }
 
   // 从管理后台读取动态设置
@@ -171,6 +225,13 @@ export async function deductQuota(userId: string, type: "chat" | "image"): Promi
   if (quota.plan !== "free") {
     if (type === "chat") quota.chatRemaining = Math.max(0, quota.chatRemaining - 1);
     if (type === "image") quota.imageRemaining = Math.max(0, quota.imageRemaining - 1);
+
+    // 所有付费套餐：递增每日消耗计数
+    if (quota.rewardDailyDate !== today) {
+      quota.rewardDailyUsed = 0;
+      quota.rewardDailyDate = today;
+    }
+    quota.rewardDailyUsed = (quota.rewardDailyUsed || 0) + (type === "image" ? 2 : 1);
   } else {
     // 免费用户扣每日额度（生图消耗2次，因API成本更高）
     if (quota.dailyFreeDate !== today) {
@@ -224,9 +285,10 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
   // 获取当前配额，叠加（如果有剩余）
   const existing = await getUserQuota(userId);
 
-  // 套餐优先级：quarterly > monthly > trial > free，叠加时不降级
-  const PLAN_RANK: Record<string, number> = { free: 0, trial: 1, monthly: 2, quarterly: 3 };
-  const keepPlan = (PLAN_RANK[existing.plan] || 0) >= (PLAN_RANK[coupon.plan] || 0) && existing.plan !== "free"
+  // 套餐优先级：从卡种配置读取 rank，高优先级不会被低优先级覆盖
+  const plans = await getPlans();
+  const getRank = (planId: string) => plans.find(p => p.id === planId)?.rank || 0;
+  const keepPlan = (getRank(existing.plan) >= getRank(coupon.plan)) && existing.plan !== "free"
     ? existing.plan : coupon.plan;
 
   // 过期时间取更晚的那个
@@ -246,7 +308,7 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
 
   await redis.set(`${QUOTA_PREFIX}${userId}`, newQuota);
 
-  const planLabel = PLAN_CONFIG[coupon.plan]?.label || coupon.plan;
+  const planLabel = plans.find(p => p.id === coupon.plan)?.label || PLAN_CONFIG[coupon.plan]?.label || coupon.plan;
   return {
     success: true,
     message: `${planLabel} 激活成功！对话 ${newQuota.chatRemaining} 次 + 生图 ${newQuota.imageRemaining} 次`,
@@ -256,12 +318,13 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
 
 // ========== 生成兑换码 ==========
 export async function generateCoupons(
-  plan: "trial" | "monthly" | "quarterly",
+  plan: string,
   count: number,
   createdBy?: string
 ): Promise<string[]> {
   const redis = getRedis();
-  const config = PLAN_CONFIG[plan];
+  const plans = await getPlans();
+  const config = plans.find(p => p.id === plan) || PLAN_CONFIG[plan];
   const codes: string[] = [];
 
   // 同一批次共享 batchId 和有效期

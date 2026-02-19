@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRedis, isValidUserId, NB_PREFIX, NB_STUDIO, collectSourceTexts, callAI } from "@/lib/notebook-utils";
+import { canUse, deductQuota } from "@/lib/quota-store";
 
 // Studio 成果类型定义
 const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string }> = {
@@ -121,6 +122,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const redis = getRedis();
     const notebookId = params.id;
 
+    // 检查用户额度
+    const check = await canUse(userId, "chat");
+    if (!check.allowed) {
+      return NextResponse.json({ error: check.reason || "额度不足", quotaExhausted: true }, { status: 429 });
+    }
+
     // 验证笔记本存在
     const nb = await redis.get(`${NB_PREFIX}${userId}:${notebookId}`);
     if (!nb) {
@@ -152,6 +159,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "AI 生成失败" }, { status: 500 });
     }
     if (!generatedText) generatedText = "生成失败，请重试";
+
+    // 扣减额度
+    deductQuota(userId, "chat").catch((err) => console.error("[Studio deductQuota]", err));
 
     // 保存生成结果
     const output = {

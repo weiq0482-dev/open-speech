@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { X, ChevronRight, ChevronLeft, Sparkles, Loader2 } from "lucide-react";
+import { X, ChevronRight, ChevronLeft, Loader2 } from "lucide-react";
+import { InterestIcon, AppLogo } from "@/components/app-icons";
 import { cn } from "@/lib/utils";
 
 const INTEREST_OPTIONS = [
@@ -94,7 +95,7 @@ export function InterestSetup({
             <X size={18} />
           </button>
           <div className="flex items-center gap-2 mb-1">
-            <Sparkles size={20} className="text-purple-500" />
+            <AppLogo size={22} />
             <h2 className="text-lg font-bold">
               {step === 1 ? "告诉我们你的兴趣" : "补充个人信息"}
             </h2>
@@ -128,7 +129,7 @@ export function InterestSetup({
                         : "border-[var(--border)] hover:border-purple-300 hover:bg-purple-50/50 dark:hover:bg-purple-900/10"
                     )}
                   >
-                    <span className="text-lg">{opt.icon}</span>
+                    <InterestIcon id={opt.id} size={22} className={isSelected ? "text-purple-600 dark:text-purple-300" : "text-[var(--muted)]"} />
                     <span className="text-[11px] font-medium">{opt.label}</span>
                   </button>
                 );
@@ -240,7 +241,7 @@ export function InterestSetup({
                   </>
                 ) : (
                   <>
-                    <Sparkles size={14} /> 生成我的专家团队
+                    <AppLogo size={14} /> 生成我的专家团队
                   </>
                 )}
               </button>

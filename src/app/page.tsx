@@ -7,7 +7,8 @@ import { ChatInput } from "@/components/chat-input";
 import { ChatMessage } from "@/components/chat-message";
 import { LoginPage } from "@/components/login-page";
 import { InterestSetup } from "@/components/interest-setup";
-import { Menu, SquarePen, Sparkles, Headphones, Send, X } from "lucide-react";
+import { Menu, SquarePen, Headphones, Send, X, Share2, Gift, Copy, Check } from "lucide-react";
+import { AppLogo, IconDeepThink, IconImageGen, IconDeepResearch, GemIcon, IconMagicWand } from "@/components/app-icons";
 
 function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => void }) {
   const [messages, setMessages] = useState<{ id: string; from: string; content: string; timestamp: string }[]>([]);
@@ -97,6 +98,7 @@ function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => v
 export default function Home() {
   const authToken = useChatStore((s) => s.authToken);
   const userEmail = useChatStore((s) => s.userEmail);
+  const authMode = useChatStore((s) => s.authMode);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -112,8 +114,9 @@ export default function Home() {
     );
   }
 
-  // 未登录时显示登录页面（双重检查）
-  if (!authToken || !userEmail) {
+  // 未登录时显示登录页面（支持邮箱登录和设备快捷登录）
+  const isLoggedIn = (authMode === "email" && authToken && userEmail) || authMode === "device";
+  if (!isLoggedIn) {
     return <LoginPage />;
   }
 
@@ -144,19 +147,35 @@ function ChatApp() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeConv = getActiveConversation();
   const [showInterestSetup, setShowInterestSetup] = useState(false);
+  const [showAdBanner, setShowAdBanner] = useState(true);
+  const [isPaidUser, setIsPaidUser] = useState(false);
 
-  // 检查是否需要显示兴趣选择
+  // 检查是否需要显示兴趣选择 + 付费状态
   useEffect(() => {
     if (!userId) return;
+    // 检查广告是否已永久关闭
+    if (localStorage.getItem(`ad_dismissed_${userId}`)) {
+      setShowAdBanner(false);
+    }
     fetch(`/api/profile?userId=${encodeURIComponent(userId)}`)
       .then((r) => r.json())
       .then((data) => {
         if (!data.profile?.setupCompleted) {
           setShowInterestSetup(true);
         }
+        if (data.plan && data.plan !== "free") {
+          setIsPaidUser(true);
+        }
       })
       .catch(() => {});
   }, [userId]);
+
+  const handleDismissAd = (permanent: boolean) => {
+    setShowAdBanner(false);
+    if (permanent && userId) {
+      localStorage.setItem(`ad_dismissed_${userId}`, "1");
+    }
+  };
 
   // 站点配置（二维码等，从后台动态读取）
   const [siteConfig, setSiteConfig] = useState<{
@@ -199,6 +218,63 @@ function ChatApp() {
     return () => clearInterval(timer);
   }, [userId]);
   const [showPromo, setShowPromo] = useState(false);
+  const [shareCode, setShareCode] = useState<string | null>(null);
+  const [shareStats, setShareStats] = useState<{ claimedCount: number; totalRewards: number } | null>(null);
+  const [shareCopied, setShareCopied] = useState(false);
+
+  // 加载分享码
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/share?userId=${encodeURIComponent(userId)}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.code) {
+          setShareCode(d.code);
+          setShareStats(d.stats || null);
+        }
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  // 检查 URL 中的分享码并领取奖励
+  useEffect(() => {
+    if (!userId) return;
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (!ref) return;
+    // 清理 URL 参数
+    window.history.replaceState({}, "", window.location.pathname);
+    fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "claim", userId, shareCode: ref }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.success) alert(d.message);
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  const handleGenerateShareCode = async () => {
+    if (!userId) return;
+    const r = await fetch("/api/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "generate", userId }),
+    });
+    const d = await r.json();
+    if (d.code) setShareCode(d.code);
+  };
+
+  const handleCopyShareLink = () => {
+    if (!shareCode) return;
+    const link = `${window.location.origin}?ref=${shareCode}`;
+    navigator.clipboard.writeText(link).then(() => {
+      setShareCopied(true);
+      setTimeout(() => setShareCopied(false), 2000);
+    });
+  };
 
   // Scroll to bottom
   const scrollToBottom = useCallback(() => {
@@ -628,7 +704,7 @@ function ChatApp() {
             </>
           )}
           <div className="flex items-center gap-2">
-            <Sparkles size={20} className="text-blue-500" />
+            <AppLogo size={24} />
             <span className="font-semibold text-lg">OpenSpeech</span>
           </div>
         </header>
@@ -636,69 +712,59 @@ function ChatApp() {
         {/* Chat area */}
         <div className="flex-1 overflow-y-auto">
           {!activeConv || activeConv.messages.length === 0 ? (
-            /* Empty state */
-            <div className="flex flex-col items-center justify-center h-full px-4">
-              <div className="max-w-2xl w-full text-center space-y-6">
-                <div className="space-y-2">
-                  <h1 className="text-3xl sm:text-4xl font-semibold">
-                    <span className="app-gradient">你好</span>
-                  </h1>
-                  <h2 className="text-xl sm:text-2xl font-medium text-[var(--foreground)]">
-                    需要我为你做些什么？
-                  </h2>
-                </div>
-
-                {/* Welcome banner */}
-                <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-left max-w-2xl mx-auto">
-                  <p className="text-sm font-medium mb-1">
+            /* Empty state - 紧凑布局，一屏显示 */
+            <div className="flex flex-col items-center justify-center h-full px-4 py-2">
+              <div className="max-w-2xl w-full text-center space-y-3">
+                {/* 标题 + 工具按钮合并 */}
+                <div className="bg-[var(--card)] rounded-2xl p-3 border border-[var(--border)] text-left max-w-2xl mx-auto">
+                  <p className="text-sm font-medium mb-0.5">
                     欢迎使用 <span className="app-gradient font-semibold">OpenSpeech</span>，你的 AI 助手
                   </p>
-                  <p className="text-xs text-[var(--muted)] mb-3">
+                  <p className="text-xs text-[var(--muted)] mb-2">
                     支持多轮对话、文件上传、代码高亮、深度研究等功能。
                   </p>
                   <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div className="p-2 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("deep-think"); }}>
-                      <span className="text-lg">🧠</span>
+                    <div className="p-1.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80 flex flex-col items-center" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("deep-think"); }}>
+                      <IconDeepThink size={22} className="text-blue-500" />
                       <p className="mt-0.5">深度推理</p>
                     </div>
-                    <div className="p-2 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("image-gen"); }}>
-                      <span className="text-lg">🎨</span>
+                    <div className="p-1.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80 flex flex-col items-center" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("image-gen"); }}>
+                      <IconImageGen size={22} className="text-pink-500" />
                       <p className="mt-0.5">AI 生图</p>
                     </div>
-                    <div className="p-2 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("deep-research"); }}>
-                      <span className="text-lg">🔍</span>
+                    <div className="p-1.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:opacity-80 flex flex-col items-center" onClick={() => { if (!activeConversationId) createConversation(); useChatStore.getState().setActiveTool("deep-research"); }}>
+                      <IconDeepResearch size={22} className="text-emerald-500" />
                       <p className="mt-0.5">深度研究</p>
                     </div>
                   </div>
                 </div>
 
-                {/* 专家库推荐 - 根据用户兴趣/职业匹配 */}
+                {/* 专家库推荐 - 紧凑版 */}
                 {useChatStore.getState().gems.length > 0 && (
-                  <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-left max-w-2xl mx-auto">
-                    <p className="text-sm font-medium mb-3 flex items-center gap-2">
-                      <Sparkles size={16} className="text-purple-500" />
+                  <div className="bg-[var(--card)] rounded-2xl p-3 border border-[var(--border)] text-left max-w-2xl mx-auto">
+                    <p className="text-xs font-medium mb-2 flex items-center gap-1.5">
+                      <IconMagicWand size={14} className="text-purple-500" />
                       为你匹配的专家
                     </p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                       {useChatStore.getState().gems.slice(0, 6).map((gem) => (
                         <div
                           key={gem.id}
-                          className="p-2.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors text-center"
+                          className="p-1.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors text-center"
                           onClick={() => {
                             const cid = createConversation(gem.id);
                             useChatStore.getState().setActiveGem(gem.id);
                           }}
                         >
-                          <span className="text-xl">{gem.icon}</span>
-                          <p className="text-xs font-medium mt-1 truncate">{gem.name}</p>
-                          <p className="text-[10px] text-[var(--muted)] mt-0.5 line-clamp-1">{gem.description}</p>
+                          <GemIcon name={gem.name} size={22} className="text-[var(--foreground)] opacity-70" />
+                          <p className="text-[10px] font-medium mt-0.5 truncate">{gem.name}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* 二维码并排区域（从管理后台动态配置） */}
+                {/* 二维码并排区域 */}
                 <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4">
                   {/* 抖音 */}
                   <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] flex flex-col items-center text-center gap-3">
@@ -717,6 +783,7 @@ function ChatApp() {
                     </div>
                   </div>
                 </div>
+
                 {/* 群介绍 */}
                 <div className="max-w-2xl mx-auto bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-xs text-[var(--muted)] leading-relaxed space-y-1.5">
                   <p className="font-medium text-[var(--foreground)]">🔥 这里只干一件事——把想法变成现实</p>
@@ -724,6 +791,31 @@ function ChatApp() {
                   <p>创业点子、工具需求、小程序/APP/网站、AI工具、自动化脚本……只要你说得出，我就帮你：梳理逻辑 → 设计方案 → 给出路径 → 手把手落地。</p>
                   <p className="font-medium text-[var(--foreground)]">不画饼、不空谈。你的超级梦想，从这里开始上线。</p>
                 </div>
+
+                {/* 广告位（可关闭） */}
+                {showAdBanner && (
+                  <div className="max-w-2xl mx-auto bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800 relative">
+                    <button
+                      onClick={() => handleDismissAd(false)}
+                      className="absolute top-2 right-2 p-1 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 text-[var(--muted)] transition-colors"
+                      title="关闭"
+                    >
+                      <X size={14} />
+                    </button>
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-blue-700 dark:text-blue-300">📢 广告位</p>
+                      <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">此处可展示推广内容，后台可配置</p>
+                    </div>
+                    {isPaidUser && (
+                      <button
+                        onClick={() => handleDismissAd(true)}
+                        className="mt-2 mx-auto block text-[10px] text-blue-500 hover:text-blue-700 underline"
+                      >
+                        永久关闭此广告
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -746,8 +838,32 @@ function ChatApp() {
         </div>
 
         {/* Input area */}
-        <div className="shrink-0 pb-2 sm:pb-4 pt-2 overflow-visible safe-bottom">
+        <div className="shrink-0 pb-2 sm:pb-4 pt-2 overflow-visible safe-bottom relative">
           <ChatInput onSend={handleSend} disabled={isGenerating} onStop={handleStop} />
+          {!isPaidUser && (
+            <div className="absolute right-2 sm:right-4 bottom-4 sm:bottom-6 z-10 group">
+              {shareCode ? (
+                <button
+                  onClick={handleCopyShareLink}
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-md"
+                  title="邀请好友得额度"
+                >
+                  {shareCopied ? <Check size={14} /> : <Gift size={14} />}
+                </button>
+              ) : (
+                <button
+                  onClick={handleGenerateShareCode}
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-md"
+                  title="邀请好友得额度"
+                >
+                  <Gift size={14} />
+                </button>
+              )}
+              <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                邀请好友，双方各得额度
+              </div>
+            </div>
+          )}
         </div>
       </main>
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRedis, verifyAdminKey, unauthorizedResponse, COUPON_PREFIX, ALL_COUPONS_KEY } from "@/lib/admin-utils";
-import { PLAN_CONFIG } from "@/lib/quota-store";
+import { getPlans, PLAN_CONFIG } from "@/lib/quota-store";
 
 export async function GET(req: NextRequest) {
   if (!verifyAdminKey(req)) return unauthorizedResponse();
@@ -10,14 +10,15 @@ export async function GET(req: NextRequest) {
     const allCodes = (await redis.get<string[]>(ALL_COUPONS_KEY)) || [];
     const coupons: Record<string, unknown>[] = [];
 
+    const plans = await getPlans();
     for (const code of allCodes) {
       const data = await redis.get<Record<string, unknown>>(`${COUPON_PREFIX}${code}`);
       if (data) {
-        const plan = data.plan as keyof typeof PLAN_CONFIG;
+        const planId = data.plan as string;
         coupons.push({
           code,
           plan: data.plan,
-          planLabel: PLAN_CONFIG[plan]?.label || data.plan,
+          planLabel: plans.find(p => p.id === planId)?.label || PLAN_CONFIG[planId]?.label || planId,
           createdAt: data.createdAt,
           expiresAt: data.expiresAt || null,
           createdBy: data.createdBy || null,

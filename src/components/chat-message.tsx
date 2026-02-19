@@ -16,7 +16,6 @@ import {
   RotateCcw,
   Share2,
   User,
-  Sparkles,
   Brain,
   ChevronDown,
   ChevronRight,
@@ -26,6 +25,7 @@ import {
   BookmarkPlus,
 } from "lucide-react";
 import { useChatStore } from "@/store/chat-store";
+import { AppLogo } from "@/components/app-icons";
 
 interface ChatMessageProps {
   message: Message;
@@ -340,8 +340,8 @@ export const ChatMessage = memo(function ChatMessage({
     >
       {!isUser && (
         <div className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-          <Sparkles size={14} className="text-white sm:hidden" />
-          <Sparkles size={16} className="text-white hidden sm:block" />
+          <span className="sm:hidden"><AppLogo size={14} /></span>
+          <span className="hidden sm:block"><AppLogo size={16} /></span>
         </div>
       )}
 

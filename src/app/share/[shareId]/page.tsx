@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useChatStore } from "@/store/chat-store";
-import { BookOpen, Lock, Users, ChevronRight, Sparkles, MessageSquareMore } from "lucide-react";
+import { BookOpen, Lock, Users, ChevronRight, MessageSquareMore } from "lucide-react";
+import { IconMagicWand } from "@/components/app-icons";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 
@@ -141,13 +142,13 @@ export default function SharePage() {
       <main className="max-w-4xl mx-auto px-4 py-6">
         {studioEntries.length === 0 ? (
           <div className="text-center py-16 text-[var(--muted)]">
-            <Sparkles size={40} className="mx-auto mb-3 opacity-20" />
+            <IconMagicWand size={40} className="mx-auto mb-3 opacity-20" />
             <p className="text-sm">此知识库还没有生成内容</p>
           </div>
         ) : (
           <div className="space-y-3">
             <h2 className="flex items-center gap-2 text-sm font-semibold text-[var(--muted)] mb-4">
-              <Sparkles size={16} className="text-purple-500" />
+              <IconMagicWand size={16} className="text-purple-500" />
               Studio 成果
             </h2>
             {studioEntries.map(([key, output]) => {

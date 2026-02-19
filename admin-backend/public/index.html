@@ -249,6 +249,28 @@
             <span style="font-size:12px;color:#999;">次/天</span>
           </div>
         </div>
+        <h3 style="font-size:14px;font-weight:600;margin-top:8px;">分享奖励设置</h3>
+        <div>
+          <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">分享奖励对话次数</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="settingShareChat" type="number" value="29" min="0" max="999" style="padding:8px 12px;border:1px solid #e0e3e8;border-radius:8px;font-size:13px;outline:none;width:80px;" />
+            <span style="font-size:12px;color:#999;">次/人</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">分享奖励生图次数</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="settingShareImage" type="number" value="9" min="0" max="999" style="padding:8px 12px;border:1px solid #e0e3e8;border-radius:8px;font-size:13px;outline:none;width:80px;" />
+            <span style="font-size:12px;color:#999;">次/人</span>
+          </div>
+        </div>
+        <div>
+          <label style="font-size:12px;color:#666;display:block;margin-bottom:4px;">奖励额度每日可消耗次数</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="settingRewardDailyLimit" type="number" value="10" min="1" max="999" style="padding:8px 12px;border:1px solid #e0e3e8;border-radius:8px;font-size:13px;outline:none;width:80px;" />
+            <span style="font-size:12px;color:#999;">次/天（哪怕有100次奖励，每天也只能用这么多）</span>
+          </div>
+        </div>
         <button onclick="saveSettings()" style="padding:10px 20px;background:#3b82f6;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:500;cursor:pointer;width:fit-content;">保存设置</button>
         <div id="settingsResult"></div>
       </div>
@@ -712,6 +734,9 @@
         const s = data.settings;
         document.getElementById('settingTrialDays').value = s.freeTrialDays || 30;
         document.getElementById('settingDailyLimit').value = s.freeDailyLimit || 5;
+        document.getElementById('settingShareChat').value = s.shareRewardChat || 29;
+        document.getElementById('settingShareImage').value = s.shareRewardImage || 9;
+        document.getElementById('settingRewardDailyLimit').value = s.rewardDailyLimit || 10;
       } catch (err) {
         console.error('加载设置失败:', err);
       }
@@ -894,12 +919,15 @@
       const resultDiv = document.getElementById('settingsResult');
       const freeTrialDays = parseInt(document.getElementById('settingTrialDays').value) || 30;
       const freeDailyLimit = parseInt(document.getElementById('settingDailyLimit').value) || 5;
+      const shareRewardChat = parseInt(document.getElementById('settingShareChat').value) || 29;
+      const shareRewardImage = parseInt(document.getElementById('settingShareImage').value) || 9;
+      const rewardDailyLimit = parseInt(document.getElementById('settingRewardDailyLimit').value) || 10;
 
       try {
         const resp = await fetch('/api/settings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ freeTrialDays, freeDailyLimit }),
+          body: JSON.stringify({ freeTrialDays, freeDailyLimit, shareRewardChat, shareRewardImage, rewardDailyLimit }),
         });
         const data = await resp.json();
         if (data.success) {

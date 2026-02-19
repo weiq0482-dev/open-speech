@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  experimental: {
+    optimizePackageImports: ["@icon-park/react"],
+  },
   async headers() {
     return [
       {

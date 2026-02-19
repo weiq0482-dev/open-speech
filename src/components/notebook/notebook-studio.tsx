@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNotebookStore } from "@/store/notebook-store";
-import { Loader2, RefreshCw, ChevronDown, ChevronRight, Sparkles, Mic, Play, Pause, Volume2 } from "lucide-react";
+import { Loader2, RefreshCw, ChevronDown, ChevronRight, Mic, Play, Pause, Volume2 } from "lucide-react";
+import { IconMagicWand } from "@/components/app-icons";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 
@@ -38,7 +39,7 @@ export function NotebookStudio({
       {/* Header */}
       <div className="px-3 py-3 border-b border-[var(--border)] shrink-0">
         <div className="flex items-center gap-1.5">
-          <Sparkles size={14} className="text-purple-500" />
+          <IconMagicWand size={14} className="text-purple-500" />
           <h3 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
             Studio
           </h3>
@@ -52,7 +53,7 @@ export function NotebookStudio({
       <div className="flex-1 overflow-y-auto p-2">
         {enabledSources.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-[var(--muted)]">
-            <Sparkles size={28} className="mb-2 opacity-30" />
+            <IconMagicWand size={28} className="mb-2 opacity-30" />
             <p className="text-xs text-center">
               添加来源后即可生成内容
             </p>

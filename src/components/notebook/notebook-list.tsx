@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useNotebookStore, Notebook } from "@/store/notebook-store";
 import {
@@ -14,7 +14,63 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NOTEBOOK_ICONS = ["📓", "📚", "🔬", "💡", "🎯", "📊", "🧠", "🌍", "💻", "🎨", "📝", "🔍"];
+// 兴趣 → 模板知识库
+interface NotebookTemplate {
+  icon: string;
+  title: string;
+  description: string;
+}
+
+const INTEREST_TEMPLATES: Record<string, NotebookTemplate[]> = {
+  "编程开发": [
+    { icon: "💻", title: "编程学习笔记", description: "代码片段、技术文章、学习心得" },
+    { icon: "🔧", title: "项目开发文档", description: "需求分析、架构设计、开发日志" },
+  ],
+  "金融投资": [
+    { icon: "📈", title: "投资研究", description: "市场分析、个股研究、投资策略" },
+    { icon: "💰", title: "理财规划", description: "资产配置、财务目标、消费记录" },
+  ],
+  "医学健康": [
+    { icon: "🩺", title: "健康管理", description: "体检记录、用药记录、健康知识" },
+    { icon: "🥗", title: "营养饮食", description: "食谱收藏、营养知识、饮食计划" },
+  ],
+  "法律咨询": [
+    { icon: "⚖️", title: "法律知识库", description: "法条收藏、案例分析、合同模板" },
+  ],
+  "教育学习": [
+    { icon: "📚", title: "学习资料库", description: "课程笔记、考试重点、学习计划" },
+    { icon: "📝", title: "论文写作", description: "参考文献、写作素材、研究进展" },
+  ],
+  "设计创意": [
+    { icon: "🎨", title: "设计灵感库", description: "配色方案、设计素材、灵感收藏" },
+  ],
+  "商业创业": [
+    { icon: "🚀", title: "创业笔记", description: "商业计划、竞品分析、市场调研" },
+    { icon: "💼", title: "商业案例", description: "成功案例、行业报告、商业模式" },
+  ],
+  "科学研究": [
+    { icon: "🔬", title: "科研文献库", description: "论文摘要、实验数据、研究笔记" },
+  ],
+  "语言学习": [
+    { icon: "🗣️", title: "外语学习", description: "词汇积累、语法笔记、听力材料" },
+  ],
+  "心理成长": [
+    { icon: "🧠", title: "自我成长", description: "心理学知识、情绪日记、成长记录" },
+  ],
+  "生活达人": [
+    { icon: "🏠", title: "生活百科", description: "生活技巧、旅行攻略、美食菜谱" },
+  ],
+  "自媒体": [
+    { icon: "�", title: "内容素材库", description: "选题灵感、爆款案例、运营技巧" },
+    { icon: "🎬", title: "视频创作", description: "脚本模板、剪辑技巧、拍摄方案" },
+  ],
+};
+
+// 通用模板（所有用户都有）
+const COMMON_TEMPLATES: NotebookTemplate[] = [
+  { icon: "�", title: "深度研究", description: "搜索和深度研究的收藏内容" },
+  { icon: "📓", title: "AI 对话精选", description: "收藏有价值的 AI 对话内容" },
+];
 
 export function NotebookList({
   userId,
@@ -28,22 +84,69 @@ export function NotebookList({
     useNotebookStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
-  const [newIcon, setNewIcon] = useState("📓");
   const [creating, setCreating] = useState(false);
+  const [templates, setTemplates] = useState<NotebookTemplate[]>([]);
+  const seedingRef = useRef(false);
 
   useEffect(() => {
     if (userId) fetchNotebooks(userId);
   }, [userId, fetchNotebooks]);
 
+  // 加载用户兴趣，生成模板列表
+  useEffect(() => {
+    if (!userId) return;
+    fetch(`/api/profile?userId=${encodeURIComponent(userId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const interests: string[] = data.profile?.interests || [];
+        const tpls: NotebookTemplate[] = [];
+        for (const interest of interests) {
+          const mapped = INTEREST_TEMPLATES[interest];
+          if (mapped) tpls.push(...mapped);
+        }
+        tpls.push(...COMMON_TEMPLATES);
+        const seen = new Set<string>();
+        setTemplates(
+          tpls.filter((t) => {
+            if (seen.has(t.title)) return false;
+            seen.add(t.title);
+            return true;
+          }).slice(0, 8)
+        );
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  // 自动创建模板知识库（首次打开时）
+  useEffect(() => {
+    if (loadingList || seedingRef.current || templates.length === 0) return;
+    const key = `nb_seeded_${userId}`;
+    if (localStorage.getItem(key)) return;
+
+    const existingTitles = new Set(notebooks.map((nb) => nb.title));
+    const toCreate = templates.filter((t) => !existingTitles.has(t.title));
+
+    if (toCreate.length === 0) {
+      localStorage.setItem(key, "1");
+      return;
+    }
+
+    seedingRef.current = true;
+    (async () => {
+      for (const tpl of toCreate) {
+        await createNotebook(userId, tpl.title, tpl.icon);
+      }
+      localStorage.setItem(key, "1");
+    })();
+  }, [loadingList, templates, notebooks, userId, createNotebook]);
+
   const handleCreate = async () => {
     if (!newTitle.trim()) return;
     setCreating(true);
-    const nb = await createNotebook(userId, newTitle.trim(), newIcon);
+    const nb = await createNotebook(userId, newTitle.trim(), "📓");
     if (nb) {
       setNewTitle("");
-      setNewIcon("📓");
       setShowCreate(false);
-      // 创建后直接打开
       onClose();
       router.push(`/notebook/${nb.id}`);
     }
@@ -105,25 +208,9 @@ export function NotebookList({
           </div>
         </div>
 
-        {/* 新建表单 */}
+        {/* 新建表单（无图标选择，默认📓） */}
         {showCreate && (
           <div className="px-5 py-3 border-b border-[var(--border)] bg-blue-50/30 dark:bg-blue-900/10 animate-fade-in">
-            <div className="flex gap-2 mb-2">
-              {NOTEBOOK_ICONS.map((icon) => (
-                <button
-                  key={icon}
-                  onClick={() => setNewIcon(icon)}
-                  className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center text-base transition-all",
-                    newIcon === icon
-                      ? "bg-blue-100 dark:bg-blue-900/40 ring-2 ring-blue-400"
-                      : "hover:bg-[var(--sidebar-hover)]"
-                  )}
-                >
-                  {icon}
-                </button>
-              ))}
-            </div>
             <div className="flex gap-2">
               <input
                 type="text"
@@ -154,8 +241,8 @@ export function NotebookList({
           ) : notebooks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-[var(--muted)]">
               <BookOpen size={40} className="mb-3 opacity-20" />
-              <p className="text-sm font-medium mb-1">还没有知识库</p>
-              <p className="text-xs">点击「新建」创建你的第一个知识库</p>
+              <p className="text-sm font-medium mb-1">正在为你准备知识库...</p>
+              <p className="text-xs">根据你的兴趣自动创建中</p>
             </div>
           ) : (
             <div className="space-y-2">

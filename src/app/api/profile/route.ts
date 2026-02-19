@@ -38,9 +38,11 @@ export async function GET(req: NextRequest) {
 
     const redis = getRedis();
     const profile = await redis.get<UserProfile>(`${PROFILE_PREFIX}${userId}`);
+    const quota = await redis.get<{ plan?: string }>(`quota:${userId}`);
 
     return NextResponse.json({
       profile: profile || { interests: [], setupCompleted: false },
+      plan: quota?.plan || "free",
     });
   } catch (err) {
     console.error("[GET /api/profile]", err);

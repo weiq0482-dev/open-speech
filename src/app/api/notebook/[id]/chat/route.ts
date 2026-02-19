@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getRedis, isValidUserId, NB_PREFIX, NB_CHAT, collectSourceTexts, callAIStream, getModelConfig } from "@/lib/notebook-utils";
+import { canUse, deductQuota } from "@/lib/quota-store";
 
 interface ChatMessage {
   role: "user" | "model";
@@ -20,6 +21,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const redis = getRedis();
     const notebookId = params.id;
+
+    // 检查用户额度
+    const check = await canUse(userId, "chat");
+    if (!check.allowed) {
+      return new Response(JSON.stringify({ error: check.reason || "额度不足", quotaExhausted: true }), {
+        status: 429,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     // 验证笔记本存在
     const nb = await redis.get(`${NB_PREFIX}${userId}:${notebookId}`);
@@ -116,6 +126,9 @@ ${sourceTexts}
 
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
+
+          // 异步扣减额度
+          deductQuota(userId, "chat").catch((err) => console.error("[Notebook deductQuota]", err));
 
           // 异步保存对话历史到 Redis
           const chatKey = `${NB_CHAT}${notebookId}`;

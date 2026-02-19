@@ -44,7 +44,21 @@ export async function POST(req: NextRequest) {
       req.headers.get("x-real-ip") ||
       "unknown";
 
-    const redis = getRedis();
+    let redis: ReturnType<typeof getRedis>;
+    try {
+      redis = getRedis();
+      // 3秒超时测试 Redis 连接（Upstash 用 HTTP，网络不通时 fetch 会无限挂起）
+      await Promise.race([
+        redis.ping(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("Redis ping timeout")), 3000)),
+      ]);
+    } catch (redisErr) {
+      console.error("[POST /api/device] Redis 连接失败:", redisErr);
+      // Redis 不可用时，用指纹生成一个临时 userId 让用户能先用
+      const fallbackId = `u_${fingerprint.slice(0, 12)}_${Date.now().toString(36)}`;
+      return NextResponse.json({ userId: fallbackId, isNew: true, offline: true });
+    }
+
     const deviceKey = `${DEVICE_PREFIX}${fingerprint}`;
     const ipKey = `${IP_DEVICE_PREFIX}${ip}`;
 

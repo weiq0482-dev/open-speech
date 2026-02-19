@@ -12,6 +12,7 @@
     "electron:build": "next build && electron-builder --win"
   },
   "dependencies": {
+    "@icon-park/react": "^1.4.2",
     "@upstash/redis": "^1.36.2",
     "clsx": "^2.1.0",
     "jose": "^6.1.3",

@@ -174,7 +174,7 @@ async function callQwenNonStream(apiKey: string, opts: AICallOptions): Promise<s
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "qwen-plus",
+      model: "qwen3.5-plus",
       messages,
       stream: false,
       temperature: opts.temperature ?? 0.7,
@@ -209,7 +209,7 @@ async function callQwenStream(apiKey: string, opts: AICallOptions): Promise<Resp
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "qwen-plus",
+      model: "qwen3.5-plus",
       messages,
       stream: true,
       temperature: opts.temperature ?? 0.7,

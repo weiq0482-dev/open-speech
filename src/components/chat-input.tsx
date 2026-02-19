@@ -19,17 +19,17 @@ import {
   Brain,
   Code,
   FileSearch,
-  Sparkles,
   Pencil,
   BookOpen,
 } from "lucide-react";
+import { AppLogo } from "@/components/app-icons";
 import { ImageEditor } from "@/components/image-editor";
 
 const TOOLS: { id: ToolMode; label: string; icon: React.ReactNode; desc: string }[] = [
-  { id: "deep-think", label: "Deep Think", icon: <Brain size={16} />, desc: "深度推理，展示思考过程" },
-  { id: "deep-research", label: "Deep Research", icon: <Search size={16} />, desc: "联网搜索，生成研究报告" },
+  { id: "deep-think", label: "深度推理", icon: <Brain size={16} />, desc: "深度推理，展示思考过程" },
+  { id: "deep-research", label: "深度研究", icon: <Search size={16} />, desc: "联网搜索，生成研究报告" },
   { id: "image-gen", label: "生成图片", icon: <Palette size={16} />, desc: "AI 文字生图 / 图片编辑" },
-  { id: "canvas", label: "Canvas", icon: <PenTool size={16} />, desc: "创意写作助手" },
+  { id: "canvas", label: "创意画布", icon: <PenTool size={16} />, desc: "创意写作助手" },
   { id: "code-assist", label: "代码助手", icon: <Code size={16} />, desc: "代码生成/调试/重构" },
   { id: "tutor", label: "学习辅导", icon: <GraduationCap size={16} />, desc: "循序渐进的学习辅导" },
   { id: "notebook", label: "文档分析", icon: <FileSearch size={16} />, desc: "上传文档进行分析问答" },
@@ -387,7 +387,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
         {!activeGem && (
           <div className="flex items-center gap-1 px-3 pt-2">
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-[var(--muted)]">
-              <Sparkles size={14} className="text-blue-500" />
+              <AppLogo size={14} />
               <span>OpenSpeech</span>
               {activeTool !== "none" && (
                 <span className="text-xs text-blue-500 ml-1">

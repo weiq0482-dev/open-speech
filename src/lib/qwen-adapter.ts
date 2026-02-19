@@ -17,7 +17,7 @@ interface QwenRequest {
 
 // 通义千问模型映射
 const QWEN_MODELS = {
-  text: "qwen-plus", // 对应 Gemini thinking-high
+  text: "qwen3.5-plus", // Qwen3.5-Plus 模型
   image: "qwen-vl-max", // 对应 Gemini image-gen（多模态理解，不支持生图）
 };
 
