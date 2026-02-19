@@ -16,6 +16,11 @@ const KNOWLEDGE_PREFIX = "kb:";
 const KNOWLEDGE_INDEX = "kb_index:";
 const MAX_ITEMS_PER_USER = 500;
 
+// userId 格式校验：只接受合法格式，防止伪造
+function isValidUserId(id: string): boolean {
+  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
+}
+
 export interface KnowledgeItem {
   id: string;
   title: string;
@@ -34,8 +39,8 @@ export async function GET(req: NextRequest) {
     const search = req.nextUrl.searchParams.get("search") || "";
     const tag = req.nextUrl.searchParams.get("tag") || "";
 
-    if (!userId) {
-      return NextResponse.json({ error: "缺少 userId" }, { status: 400 });
+    if (!userId || !isValidUserId(userId)) {
+      return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
     }
 
     const redis = getRedis();
@@ -97,6 +102,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "缺少必要参数" }, { status: 400 });
     }
 
+    if (!isValidUserId(userId)) {
+      return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
+    }
+
     const redis = getRedis();
     const indexKey = `${KNOWLEDGE_INDEX}${userId}`;
 
@@ -137,6 +146,10 @@ export async function DELETE(req: NextRequest) {
 
     if (!userId || !itemId) {
       return NextResponse.json({ error: "缺少参数" }, { status: 400 });
+    }
+
+    if (!isValidUserId(userId)) {
+      return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
     }
 
     const redis = getRedis();

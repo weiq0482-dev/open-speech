@@ -14,6 +14,10 @@ function getRedis(): Redis {
 
 const PROFILE_PREFIX = "profile:";
 
+function isValidUserId(id: string): boolean {
+  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
+}
+
 export interface UserProfile {
   interests: string[];
   customInterests?: string;
@@ -28,8 +32,8 @@ export interface UserProfile {
 export async function GET(req: NextRequest) {
   try {
     const userId = req.nextUrl.searchParams.get("userId");
-    if (!userId) {
-      return NextResponse.json({ error: "缺少 userId" }, { status: 400 });
+    if (!userId || !isValidUserId(userId)) {
+      return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
     }
 
     const redis = getRedis();
@@ -49,8 +53,8 @@ export async function POST(req: NextRequest) {
   try {
     const { userId, interests, customInterests, profession, researchDirection } = await req.json();
 
-    if (!userId) {
-      return NextResponse.json({ error: "缺少 userId" }, { status: 400 });
+    if (!userId || !isValidUserId(userId)) {
+      return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
     }
 
     const allInterests = [...(interests || [])];

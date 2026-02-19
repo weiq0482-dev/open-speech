@@ -92,6 +92,7 @@ export async function* transformQwenStream(response: Response): AsyncGenerator<s
   const decoder = new TextDecoder();
   let buffer = "";
 
+  let receivedDone = false;
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
@@ -104,6 +105,7 @@ export async function* transformQwenStream(response: Response): AsyncGenerator<s
       if (!line.startsWith("data: ")) continue;
       const data = line.slice(6).trim();
       if (data === "[DONE]") {
+        receivedDone = true;
         yield "data: [DONE]\n\n";
         continue;
       }
@@ -112,14 +114,16 @@ export async function* transformQwenStream(response: Response): AsyncGenerator<s
         const json = JSON.parse(data);
         const delta = json.choices?.[0]?.delta;
         if (delta?.content) {
-          // 转换为 Gemini SSE 格式
           yield `data: ${JSON.stringify({ text: delta.content })}\n\n`;
         }
-        // 通义千问不支持 thinking 流，直接输出文本
       } catch (e) {
         console.warn("[Qwen stream parse error]", e);
       }
     }
+  }
+  // 确保始终发送 [DONE] 结束信号
+  if (!receivedDone) {
+    yield "data: [DONE]\n\n";
   }
 }
 

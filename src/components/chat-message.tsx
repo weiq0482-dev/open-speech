@@ -56,11 +56,18 @@ function SaveToKnowledgeButton({ content }: { content: string }) {
           userId,
           title,
           content: content.slice(0, 5000),
+          source: "chat",
           tags: ["AI对话"],
         }),
       });
-      if (resp.ok) setSaved(true);
-    } catch {}
+      if (resp.ok) {
+        setSaved(true);
+      } else {
+        alert("保存失败，请稍后重试");
+      }
+    } catch {
+      alert("网络错误，请检查连接");
+    }
     setSaving(false);
   };
 

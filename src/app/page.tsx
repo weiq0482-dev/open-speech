@@ -22,7 +22,7 @@ function ContactMiniChat({ userId, onClose }: { userId: string; onClose: () => v
     } catch {}
   }, [userId]);
 
-  useEffect(() => { fetchMsgs(); const t = setInterval(fetchMsgs, 3000); return () => clearInterval(t); }, [fetchMsgs]);
+  useEffect(() => { fetchMsgs(); const t = setInterval(fetchMsgs, 8000); return () => clearInterval(t); }, [fetchMsgs]);
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const handleSend = async () => {
@@ -195,7 +195,7 @@ function ChatApp() {
       } catch {}
     };
     checkNewReply();
-    const timer = setInterval(checkNewReply, 3000);
+    const timer = setInterval(checkNewReply, 10000);
     return () => clearInterval(timer);
   }, [userId]);
   const [showPromo, setShowPromo] = useState(false);
@@ -290,14 +290,14 @@ function ChatApp() {
           setIsGenerating(false);
           if (isQuotaIssue) setShowPromo(true);
           return;
+
         }
 
         // === Image generation: non-streaming JSON response ===
         if (activeTool === "image-gen") {
           const data = await response.json();
           if (data.error) {
-            updateMessage(convId!, assistantMsgId, { content: "" });
-            setShowPromo(true);
+            updateMessage(convId!, assistantMsgId, { content: `⚠️ ${data.error}` });
           } else {
             updateMessage(convId!, assistantMsgId, {
               content: data.text || "图片已生成：",
@@ -374,8 +374,8 @@ function ChatApp() {
                   });
                 }
                 if (json.error) {
-                  updateMessage(convId!, assistantMsgId, { content: "" });
-                  setShowPromo(true);
+                  fullContent += `\n⚠️ ${json.error}`;
+                  updateMessage(convId!, assistantMsgId, { content: fullContent });
                 }
               } catch (e) {
                 console.warn("[SSE parse error]", data?.slice(0, 100), e);
@@ -402,7 +402,7 @@ function ChatApp() {
             // 提取标签：从来源中获取关键词
             const tags = ["深度研究"];
             if (collectedSources.length > 0) {
-              tags.push(...collectedSources.slice(0, 3).map(s => new URL(s.url).hostname.replace("www.", "")).filter(Boolean));
+              tags.push(...collectedSources.slice(0, 3).map(s => { try { return new URL(s.url).hostname.replace("www.", ""); } catch { return ""; } }).filter(Boolean));
             }
             await fetch("/api/knowledge", {
               method: "POST",
@@ -425,8 +425,7 @@ function ChatApp() {
         if (error instanceof DOMException && error.name === "AbortError") {
           // 用户主动停止，保留已生成的内容
         } else {
-          updateMessage(convId!, assistantMsgId, { content: "" });
-          setShowPromo(true);
+          updateMessage(convId!, assistantMsgId, { content: `⚠️ 请求失败，请稍后再试` });
         }
       } finally {
         abortControllerRef.current = null;
