@@ -25,7 +25,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import { AuthDialog } from "./auth-dialog";
-import { KnowledgePanel } from "./knowledge-panel";
+import { NotebookList } from "./notebook/notebook-list";
 
 interface ContactMsg {
   id: string;
@@ -722,7 +722,7 @@ export function Sidebar() {
 
       {/* 知识库面板 */}
       {showKnowledge && (
-        <KnowledgePanel userId={userId} onClose={() => setShowKnowledge(false)} />
+        <NotebookList userId={userId} onClose={() => setShowKnowledge(false)} />
       )}
 
       {/* 邮箱登录弹窗 */}
