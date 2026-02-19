@@ -1,20 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
+import { getRedis, isValidUserId, NB_PREFIX, NB_INDEX, NB_SRC_PREFIX, NB_SRC_INDEX, NB_CHAT, NB_STUDIO, MAX_NOTEBOOKS_PER_USER } from "@/lib/notebook-utils";
 
 // ========== 数据模型 ==========
 export interface Notebook {
@@ -51,17 +36,6 @@ export interface StudioOutput {
   generatedAt: string;
 }
 
-// Redis key 前缀
-const NB_PREFIX = "nb:";
-const NB_INDEX = "nb_index:";
-const NB_SRC_PREFIX = "nb_src:";
-const NB_SRC_INDEX = "nb_src_index:";
-const NB_CHAT = "nb_chat:";
-const NB_STUDIO = "nb_studio:";
-const MAX_NOTEBOOKS_PER_USER = 50;
-
-// 导出供其他路由使用
-export { getRedis, isValidUserId, NB_PREFIX, NB_INDEX, NB_SRC_PREFIX, NB_SRC_INDEX, NB_CHAT, NB_STUDIO };
 
 // GET: 获取用户的所有笔记本
 export async function GET(req: NextRequest) {

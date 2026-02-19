@@ -1,58 +1,10 @@
 import { NextRequest } from "next/server";
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
-
-const NB_PREFIX = "nb:";
-const NB_SRC_PREFIX = "nb_src:";
-const NB_SRC_INDEX = "nb_src_index:";
-const NB_CHAT = "nb_chat:";
+import { getRedis, isValidUserId, NB_PREFIX, NB_CHAT, collectSourceTexts, callAIStream, getModelConfig } from "@/lib/notebook-utils";
 
 interface ChatMessage {
   role: "user" | "model";
   content: string;
   timestamp: string;
-}
-
-// 收集笔记本的所有启用来源文本
-async function collectSourceTexts(redis: Redis, notebookId: string): Promise<string> {
-  const srcIds: string[] = (await redis.lrange(`${NB_SRC_INDEX}${notebookId}`, 0, -1)) || [];
-  if (srcIds.length === 0) return "";
-
-  const pipeline = redis.pipeline();
-  for (const id of srcIds) {
-    pipeline.get(`${NB_SRC_PREFIX}${notebookId}:${id}`);
-  }
-  const results = await pipeline.exec();
-
-  const texts: string[] = [];
-  let totalLen = 0;
-  const MAX_TOTAL = 200000;
-
-  for (const src of results) {
-    if (!src || typeof src !== "object") continue;
-    const s = src as { enabled?: boolean; title?: string; content?: string };
-    if (!s.enabled) continue;
-    const chunk = `【来源: ${s.title || "未命名"}】\n${s.content || ""}`;
-    if (totalLen + chunk.length > MAX_TOTAL) break;
-    texts.push(chunk);
-    totalLen += chunk.length;
-  }
-
-  return texts.join("\n\n---\n\n");
 }
 
 // POST: 笔记本 AI 对话（流式）
@@ -98,34 +50,16 @@ ${sourceTexts}
       parts: [{ text: m.content }],
     }));
 
-    // 调用 AI（流式）
-    const apiBase = process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com";
-    const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "";
-    const model = "gemini-2.5-pro-preview-06-05";
-
-    const aiResp = await fetch(
-      `${apiBase}/v1beta/models/${model}:streamGenerateContent?alt=sse`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: systemPrompt }],
-          },
-          contents: [
-            ...chatHistory,
-            { role: "user", parts: [{ text: message }] },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8192,
-          },
-        }),
-      }
-    );
+    // 调用 AI（流式，自动适配 Gemini / 千问）
+    const aiResp = await callAIStream({
+      systemPrompt,
+      contents: [
+        ...chatHistory,
+        { role: "user", parts: [{ text: message }] },
+      ],
+      temperature: 0.7,
+      maxOutputTokens: 8192,
+    });
 
     if (!aiResp.ok || !aiResp.body) {
       console.error("[Notebook Chat AI]", aiResp.status);
@@ -135,6 +69,10 @@ ${sourceTexts}
       });
     }
 
+    // 判断当前模型提供商以选择正确的解析方式
+    const config = await getModelConfig();
+    const isQwen = config.provider === "qwen";
+
     // 转发流式响应
     const reader = aiResp.body.getReader();
     const decoder = new TextDecoder();
@@ -143,13 +81,15 @@ ${sourceTexts}
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
+        let buffer = "";
         try {
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n");
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
 
             for (const line of lines) {
               if (!line.startsWith("data: ")) continue;
@@ -158,7 +98,14 @@ ${sourceTexts}
 
               try {
                 const parsed = JSON.parse(data);
-                const text = parsed.candidates?.[0]?.content?.parts?.[0]?.text;
+                let text = "";
+                if (isQwen) {
+                  // 千问格式: choices[0].delta.content
+                  text = parsed.choices?.[0]?.delta?.content || "";
+                } else {
+                  // Gemini 格式: candidates[0].content.parts[0].text
+                  text = parsed.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                }
                 if (text) {
                   fullResponse += text;
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));

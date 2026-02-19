@@ -1,22 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
-
-const NB_PREFIX = "nb:";
+import { getRedis, isValidUserId, NB_PREFIX } from "@/lib/notebook-utils";
 
 // GET: 获取单个笔记本详情
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {

@@ -1,24 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
+import { getRedis, isValidUserId, NB_PREFIX, NB_MEMBERS_PREFIX, NB_DISCUSS } from "@/lib/notebook-utils";
 
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
-
-const NB_PREFIX = "nb:";
-const NB_MEMBERS_PREFIX = "nb_members:";
-const NB_DISCUSS_PREFIX = "nb_discuss:";
 const PROFILE_PREFIX = "profile:";
 const MAX_DISCUSS_MESSAGES = 500;
 
@@ -42,7 +24,7 @@ export interface DiscussMessage {
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const userId = req.nextUrl.searchParams.get("userId");
-    const after = req.nextUrl.searchParams.get("after"); // 时间戳，获取此时间之后的消息
+    const after = req.nextUrl.searchParams.get("after");
     if (!userId || !isValidUserId(userId)) {
       return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
     }
@@ -50,33 +32,37 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const redis = getRedis();
     const notebookId = params.id;
 
-    // 检查成员资格
+    // 检查成员资格（成员列表 or owner）
     const isMember = await redis.sismember(`${NB_MEMBERS_PREFIX}${notebookId}`, userId);
-    // 也检查是否是 owner
-    const nb = await redis.get(`${NB_PREFIX}${userId}:${notebookId}`);
-    if (!isMember && !nb) {
-      // 尝试查找是否任何用户的该笔记本存在（支持非 owner 成员访问）
-      // 简化处理：成员列表中有就允许
-      if (!isMember) {
+    if (!isMember) {
+      const nb = await redis.get(`${NB_PREFIX}${userId}:${notebookId}`);
+      if (!nb) {
         return NextResponse.json({ error: "无权访问此讨论组" }, { status: 403 });
       }
     }
 
-    const discussKey = `${NB_DISCUSS_PREFIX}${notebookId}`;
-    const messages: DiscussMessage[] = (await redis.get(discussKey) as DiscussMessage[]) || [];
+    // 使用 Redis List 存储（rpush 追加，lrange 读取）
+    const discussKey = `${NB_DISCUSS}${notebookId}`;
+    const total = await redis.llen(discussKey);
+
+    // 返回最近 100 条
+    const start = Math.max(0, total - 100);
+    const rawMessages: string[] = await redis.lrange(discussKey, start, -1);
+    const messages: DiscussMessage[] = rawMessages.map((m) => {
+      if (typeof m === "string") {
+        try { return JSON.parse(m); } catch { return m; }
+      }
+      return m as unknown as DiscussMessage;
+    });
 
     // 如果有 after 参数，只返回更新的消息
     if (after) {
       const afterTime = new Date(after).getTime();
       const newMessages = messages.filter((m) => new Date(m.timestamp).getTime() > afterTime);
-      return NextResponse.json({ messages: newMessages, total: messages.length });
+      return NextResponse.json({ messages: newMessages, total });
     }
 
-    // 返回最近 100 条
-    return NextResponse.json({
-      messages: messages.slice(-100),
-      total: messages.length,
-    });
+    return NextResponse.json({ messages, total });
   } catch (err) {
     console.error("[GET /api/notebook/[id]/discuss]", err);
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });
@@ -122,14 +108,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       metadata: metadata || undefined,
     };
 
-    // 保存消息
-    const discussKey = `${NB_DISCUSS_PREFIX}${notebookId}`;
-    const messages: DiscussMessage[] = (await redis.get(discussKey) as DiscussMessage[]) || [];
-    messages.push(msg);
+    // 使用 Redis List 原子追加（rpush），避免竞态条件
+    const discussKey = `${NB_DISCUSS}${notebookId}`;
+    await redis.rpush(discussKey, JSON.stringify(msg));
 
-    // 只保留最近 N 条
-    const trimmed = messages.slice(-MAX_DISCUSS_MESSAGES);
-    await redis.set(discussKey, trimmed);
+    // 超出上限时修剪
+    const len = await redis.llen(discussKey);
+    if (len > MAX_DISCUSS_MESSAGES) {
+      await redis.ltrim(discussKey, len - MAX_DISCUSS_MESSAGES, -1);
+    }
 
     return NextResponse.json({ success: true, message: msg });
   } catch (err) {

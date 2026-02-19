@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isUrlSafe } from "@/lib/notebook-utils";
 
 // POST: 抓取 URL 内容（服务端代理，避免 CORS）
 export async function POST(req: NextRequest) {
@@ -8,12 +9,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "缺少 URL" }, { status: 400 });
     }
 
-    // 基本 URL 验证
+    // URL 验证 + SSRF 防护
     let parsedUrl: URL;
     try {
       parsedUrl = new URL(url);
-      if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-        return NextResponse.json({ error: "仅支持 HTTP/HTTPS" }, { status: 400 });
+      if (!isUrlSafe(url)) {
+        return NextResponse.json({ error: "不允许访问此地址" }, { status: 400 });
       }
     } catch {
       return NextResponse.json({ error: "无效的 URL" }, { status: 400 });

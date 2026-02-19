@@ -265,8 +265,6 @@ function DiscussPanel({ notebookId, userId }: { notebookId: string; userId: stri
 
   const handleSaveToKb = useCallback(async (msg: DiscussMessage) => {
     try {
-      const resp = await fetch("/api/notebook", { method: "GET" });
-      // 简单实现：保存到用户的第一个笔记本的来源，或提示用户
       await fetch(`/api/notebook/${notebookId}/sources`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

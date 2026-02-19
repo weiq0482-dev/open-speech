@@ -1,27 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
-
-const NB_PREFIX = "nb:";
-const NB_SHARE_PREFIX = "nb_share:";
-const NB_MEMBERS_PREFIX = "nb_members:";
-const NB_SRC_PREFIX = "nb_src:";
-const NB_SRC_INDEX = "nb_src_index:";
-const NB_STUDIO = "nb_studio:";
+import { getRedis, isValidUserId, NB_PREFIX, NB_SHARE_PREFIX, NB_MEMBERS_PREFIX, NB_SRC_PREFIX, NB_SRC_INDEX, NB_STUDIO } from "@/lib/notebook-utils";
 
 interface ShareConfig {
   shareId: string;

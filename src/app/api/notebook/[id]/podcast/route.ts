@@ -1,25 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
-
-const NB_PREFIX = "nb:";
-const NB_SRC_PREFIX = "nb_src:";
-const NB_SRC_INDEX = "nb_src_index:";
-const NB_PODCAST = "nb_podcast:";
+import { getRedis, isValidUserId, NB_PREFIX, NB_PODCAST, collectSourceTexts, callAI } from "@/lib/notebook-utils";
 
 // Edge TTS 中文声音
 const VOICES = {
@@ -34,29 +14,6 @@ interface PodcastConfig {
   voice?: string;                   // 朗读模式的声音
   hostVoice?: string;               // 对话模式主持人
   guestVoice?: string;              // 对话模式嘉宾
-}
-
-// 收集来源文本
-async function collectSourceTexts(redis: Redis, notebookId: string): Promise<string> {
-  const srcIds: string[] = (await redis.lrange(`${NB_SRC_INDEX}${notebookId}`, 0, -1)) || [];
-  if (srcIds.length === 0) return "";
-  const pipeline = redis.pipeline();
-  for (const id of srcIds) {
-    pipeline.get(`${NB_SRC_PREFIX}${notebookId}:${id}`);
-  }
-  const results = await pipeline.exec();
-  const texts: string[] = [];
-  let totalLen = 0;
-  for (const src of results) {
-    if (!src || typeof src !== "object") continue;
-    const s = src as { enabled?: boolean; title?: string; content?: string };
-    if (!s.enabled) continue;
-    const chunk = `【${s.title || "未命名"}】\n${s.content || ""}`;
-    if (totalLen + chunk.length > 100000) break;
-    texts.push(chunk);
-    totalLen += chunk.length;
-  }
-  return texts.join("\n\n");
 }
 
 // POST: 生成播客脚本（第一步：AI 生成脚本，返回脚本内容）
@@ -110,36 +67,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 6. 直接输出脚本文本，不要加任何标记或格式说明`;
     }
 
-    // 调用 AI 生成脚本
-    const apiBase = process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com";
-    const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "";
-    const model = "gemini-2.5-pro-preview-06-05";
-
-    const aiResp = await fetch(
-      `${apiBase}/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: prompt }] },
-          contents: [{
-            role: "user",
-            parts: [{ text: `以下是知识库的资料，请生成播客脚本：\n\n${sourceTexts.slice(0, 50000)}` }],
-          }],
-          generationConfig: { temperature: 0.9, maxOutputTokens: 8192 },
-        }),
-      }
-    );
-
-    if (!aiResp.ok) {
+    // 调用 AI 生成脚本（自动适配 Gemini / 千问）
+    let script: string;
+    try {
+      script = await callAI({
+        systemPrompt: prompt,
+        contents: [{
+          role: "user",
+          parts: [{ text: `以下是知识库的资料，请生成播客脚本：\n\n${sourceTexts.slice(0, 50000)}` }],
+        }],
+        temperature: 0.9,
+        maxOutputTokens: 8192,
+      });
+    } catch (err) {
+      console.error("[Podcast AI]", err);
       return NextResponse.json({ error: "AI 生成失败" }, { status: 500 });
     }
-
-    const aiData = await aiResp.json();
-    const script = aiData.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
     // 解析对话脚本为结构化数据
     let segments: { speaker: string; text: string; voice: string }[] = [];

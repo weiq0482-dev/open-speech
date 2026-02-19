@@ -1,25 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
-
-const NB_PREFIX = "nb:";
-const NB_SRC_PREFIX = "nb_src:";
-const NB_SRC_INDEX = "nb_src_index:";
-const NB_STUDIO = "nb_studio:";
+import { getRedis, isValidUserId, NB_PREFIX, NB_STUDIO, collectSourceTexts, callAI } from "@/lib/notebook-utils";
 
 // Studio 成果类型定义
 const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string }> = {
@@ -80,34 +60,6 @@ const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string
 请用专业简报格式输出，适合快速阅读和决策参考。`,
   },
 };
-
-// 收集笔记本的所有启用来源文本
-async function collectSourceTexts(redis: Redis, notebookId: string): Promise<string> {
-  const srcIds: string[] = (await redis.lrange(`${NB_SRC_INDEX}${notebookId}`, 0, -1)) || [];
-  if (srcIds.length === 0) return "";
-
-  const pipeline = redis.pipeline();
-  for (const id of srcIds) {
-    pipeline.get(`${NB_SRC_PREFIX}${notebookId}:${id}`);
-  }
-  const results = await pipeline.exec();
-
-  const texts: string[] = [];
-  let totalLen = 0;
-  const MAX_TOTAL = 200000; // 最多 20 万字
-
-  for (const src of results) {
-    if (!src || typeof src !== "object") continue;
-    const s = src as { enabled?: boolean; title?: string; content?: string };
-    if (!s.enabled) continue;
-    const chunk = `【来源: ${s.title || "未命名"}】\n${s.content || ""}`;
-    if (totalLen + chunk.length > MAX_TOTAL) break;
-    texts.push(chunk);
-    totalLen += chunk.length;
-  }
-
-  return texts.join("\n\n---\n\n");
-}
 
 // GET: 获取已生成的 Studio 成果
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -181,45 +133,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "没有可用的来源内容" }, { status: 400 });
     }
 
-    // 调用 AI 生成
-    const apiBase = process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com";
-    const apiKey = process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "";
-    const model = "gemini-2.5-pro-preview-06-05";
-
-    const aiResp = await fetch(
-      `${apiBase}/v1beta/models/${model}:generateContent`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          system_instruction: {
-            parts: [{ text: studioType.prompt }],
+    // 调用 AI 生成（自动适配 Gemini / 千问）
+    let generatedText: string;
+    try {
+      generatedText = await callAI({
+        systemPrompt: studioType.prompt,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `以下是知识库的资料内容，请基于这些资料生成${studioType.label}：\n\n${sourceTexts}` }],
           },
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: `以下是知识库的资料内容，请基于这些资料生成${studioType.label}：\n\n${sourceTexts}` }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 8192,
-          },
-        }),
-      }
-    );
-
-    if (!aiResp.ok) {
-      console.error("[Studio AI]", aiResp.status, await aiResp.text().catch(() => ""));
+        ],
+        temperature: 0.7,
+        maxOutputTokens: 8192,
+      });
+    } catch (err) {
+      console.error("[Studio AI]", err);
       return NextResponse.json({ error: "AI 生成失败" }, { status: 500 });
     }
-
-    const aiData = await aiResp.json();
-    const generatedText =
-      aiData.candidates?.[0]?.content?.parts?.[0]?.text || "生成失败，请重试";
+    if (!generatedText) generatedText = "生成失败，请重试";
 
     // 保存生成结果
     const output = {

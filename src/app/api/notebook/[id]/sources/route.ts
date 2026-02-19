@@ -1,25 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Redis } from "@upstash/redis";
-
-let _redis: Redis | null = null;
-function getRedis(): Redis {
-  if (!_redis) {
-    _redis = new Redis({
-      url: (process.env.KV_REST_API_URL || "").trim(),
-      token: (process.env.KV_REST_API_TOKEN || "").trim(),
-    });
-  }
-  return _redis;
-}
-
-function isValidUserId(id: string): boolean {
-  return /^u_[a-f0-9]{12}_[a-z0-9]+$/.test(id) || /^em_[a-f0-9]{16}$/.test(id);
-}
-
-const NB_PREFIX = "nb:";
-const NB_SRC_PREFIX = "nb_src:";
-const NB_SRC_INDEX = "nb_src_index:";
-const MAX_SOURCES = 50;
+import { getRedis, isValidUserId, NB_PREFIX, NB_SRC_PREFIX, NB_SRC_INDEX, MAX_SOURCES } from "@/lib/notebook-utils";
 
 interface NotebookSource {
   id: string;
@@ -179,6 +159,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
     const redis = getRedis();
     const notebookId = params.id;
+
+    // 验证笔记本属于该用户
+    const nb = await redis.get(`${NB_PREFIX}${userId}:${notebookId}`);
+    if (!nb) {
+      return NextResponse.json({ error: "知识库不存在" }, { status: 404 });
+    }
+
     const srcKey = `${NB_SRC_PREFIX}${notebookId}:${sourceId}`;
     const source = await redis.get(srcKey) as Record<string, unknown> | null;
     if (!source) {
