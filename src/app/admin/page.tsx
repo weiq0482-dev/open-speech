@@ -39,6 +39,7 @@ interface Coupon {
   planLabel: string;
   createdAt: string;
   expiresAt: string | null;
+  createdBy: string | null;
   usedBy: string | null;
   usedAt: string | null;
 }
@@ -586,7 +587,7 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
     try {
       const resp = await adminFetch("/api/admin/coupons/generate", adminKey, {
         method: "POST",
-        body: JSON.stringify({ plan, count }),
+        body: JSON.stringify({ plan, count, createdBy: "super_admin" }),
       });
       if (resp.ok) {
         const data = await resp.json();
@@ -657,7 +658,27 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
         )}
       </div>
 
-      {/* 统计 */}
+      {/* 统计 + 导出 */}
+      <div className="flex items-center justify-between mb-2">
+        <div />
+        <button
+          onClick={() => {
+            const lines = ["\u5151\u6362\u7801,\u5957\u9910,\u72b6\u6001,\u6709\u6548\u671f,\u521b\u5efa\u8005,\u4f7f\u7528\u8005,\u4f7f\u7528\u65f6\u95f4,\u521b\u5efa\u65f6\u95f4"];
+            coupons.forEach((c) => {
+              const status = c.usedBy ? "\u5df2\u4f7f\u7528" : (c.expiresAt && new Date(c.expiresAt) < new Date() ? "\u5df2\u8fc7\u671f" : "\u53ef\u7528");
+              lines.push([c.code, c.planLabel, status, c.expiresAt || "", c.createdBy || "", c.usedBy || "", c.usedAt || "", c.createdAt].join(","));
+            });
+            const blob = new Blob(["\uFEFF" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = `coupons_${new Date().toISOString().slice(0,10)}.csv`;
+            a.click();
+          }}
+          className="px-3 py-1.5 rounded-lg text-xs bg-white border border-gray-200 hover:bg-gray-50"
+        >
+          导出 CSV
+        </button>
+      </div>
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-xl p-4 border border-gray-200">
           <p className="text-2xl font-bold">{coupons.length}</p>
@@ -682,6 +703,7 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
               <th className="text-left px-4 py-3 font-medium">套餐</th>
               <th className="text-left px-4 py-3 font-medium">状态</th>
               <th className="text-left px-4 py-3 font-medium">有效期剩余</th>
+              <th className="text-left px-4 py-3 font-medium">创建者</th>
               <th className="text-left px-4 py-3 font-medium">使用者</th>
               <th className="text-left px-4 py-3 font-medium">使用时间</th>
               <th className="text-left px-4 py-3 font-medium">创建时间</th>
@@ -716,6 +738,7 @@ function CouponsTab({ adminKey }: { adminKey: string }) {
                   <td className={`px-4 py-3 text-xs font-medium ${expiry.color}`}>
                     {expiry.text}
                   </td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{c.createdBy || "-"}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">{c.usedBy ? shortId(c.usedBy) : "-"}</td>
                   <td className="px-4 py-3 text-xs text-gray-500">
                     {c.usedAt ? new Date(c.usedAt).toLocaleString("zh-CN") : "-"}

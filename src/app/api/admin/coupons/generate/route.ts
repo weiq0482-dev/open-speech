@@ -6,13 +6,13 @@ export async function POST(req: NextRequest) {
   if (!verifyAdminKey(req)) return unauthorizedResponse();
 
   try {
-    const { plan = "trial", count = 5 } = await req.json();
+    const { plan = "trial", count = 5, createdBy = "super_admin" } = await req.json();
     if (!["trial", "monthly", "quarterly"].includes(plan)) {
       return NextResponse.json({ error: "无效的套餐类型" }, { status: 400 });
     }
 
     const num = Math.min(Math.max(1, count), 50);
-    const codes = await generateCoupons(plan, num);
+    const codes = await generateCoupons(plan, num, createdBy);
 
     return NextResponse.json({ success: true, codes, plan });
   } catch (err) {

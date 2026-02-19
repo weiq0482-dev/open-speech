@@ -9,6 +9,7 @@ export interface CouponData {
   createdAt: string;
   expiresAt?: string;   // 兑换码本身的有效期（未使用过期作废）
   batchId?: string;     // 生成批次标识
+  createdBy?: string;   // 创建者（管理员用户名）
   usedBy?: string;
   usedAt?: string;
 }
@@ -254,7 +255,8 @@ export async function redeemCoupon(userId: string, code: string): Promise<{ succ
 // ========== 生成兑换码 ==========
 export async function generateCoupons(
   plan: "trial" | "monthly" | "quarterly",
-  count: number
+  count: number,
+  createdBy?: string
 ): Promise<string[]> {
   const redis = getRedis();
   const config = PLAN_CONFIG[plan];
@@ -280,6 +282,7 @@ export async function generateCoupons(
       createdAt: new Date().toISOString(),
       expiresAt: expiresAtStr,
       batchId,
+      createdBy: createdBy || "super_admin",
     };
 
     await redis.set(`${COUPON_PREFIX}${code}`, coupon);

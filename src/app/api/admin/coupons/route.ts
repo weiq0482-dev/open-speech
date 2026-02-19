@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
           planLabel: PLAN_CONFIG[plan]?.label || data.plan,
           createdAt: data.createdAt,
           expiresAt: data.expiresAt || null,
+          createdBy: data.createdBy || null,
           usedBy: data.usedBy || null,
           usedAt: data.usedAt || null,
         });
