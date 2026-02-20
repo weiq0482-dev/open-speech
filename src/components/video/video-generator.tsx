@@ -72,7 +72,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
   // 配置
   const [videoMode, setVideoMode] = useState<string>("slides");
   const [videoStyle, setVideoStyle] = useState<string>("knowledge");
-  const [ratio, setRatio] = useState<"16:9" | "9:16" | "1:1">("9:16");
+  const [ratios, setRatios] = useState<Array<"16:9" | "9:16" | "1:1">>([("9:16")]);
   const [theme, setTheme] = useState<string>("dark");
   const [duration, setDuration] = useState(180);
   const [voiceId, setVoiceId] = useState("longxiaochun");
@@ -176,7 +176,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
     if (!script) return;
     setExportProgress({ phase: "preparing", progress: 0, message: "准备导出..." });
     // 模拟导出进度（实际导出需要 canvas 录制）
-    const config = getExportConfig(ratio, "medium");
+    const config = getExportConfig(ratios[0] || "9:16", "medium");
     const totalMs = script.totalDuration * 1000;
     let pct = 0;
     const timer = setInterval(() => {
@@ -188,7 +188,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
         setExportProgress({ phase: "rendering", progress: pct, message: `渲染中... ${pct}%（${config.width}x${config.height}）` });
       }
     }, totalMs / 50);
-  }, [script, ratio]);
+  }, [script, ratios]);
 
   // ========== 发布建议 ==========
   const handlePublishSuggestions = useCallback(async () => {
@@ -274,8 +274,9 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
   // ========== 计算预览尺寸 ==========
   const getPreviewSize = () => {
     const maxW = 480, maxH = 360;
-    if (ratio === "9:16") return { width: Math.round(maxH * 9 / 16), height: maxH };
-    if (ratio === "1:1") return { width: maxH, height: maxH };
+    const r = ratios[0] || "9:16";
+    if (r === "9:16") return { width: Math.round(maxH * 9 / 16), height: maxH };
+    if (r === "1:1") return { width: maxH, height: maxH };
     return { width: maxW, height: Math.round(maxW * 9 / 16) };
   };
 
@@ -284,7 +285,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
       {/* 顶栏 */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
         <div className="flex items-center gap-2">
-          <Video size={16} className="text-purple-500" />
+          <Video size={16} className="text-blue-500" />
           <h3 className="text-sm font-semibold">AI 视频生成</h3>
         </div>
         <button onClick={onClose} className="text-xs text-[var(--muted)] hover:text-[var(--fg)]">关闭</button>
@@ -429,12 +430,12 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                 {RATIO_OPTIONS.map((r) => (
                   <button
                     key={r.id}
-                    onClick={() => setRatio(r.id)}
+                    onClick={() => setRatios(prev => prev.includes(r.id) ? (prev.length > 1 ? prev.filter(x => x !== r.id) : prev) : [...prev, r.id])}
                     className={cn(
                       "flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-[10px] transition-all border",
-                      ratio === r.id
-                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                        : "border-[var(--border)] hover:border-purple-300"
+                      ratios.includes(r.id)
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-[var(--border)] hover:border-blue-300"
                     )}
                   >
                     {r.icon}
@@ -480,7 +481,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                 step={30}
                 value={duration}
                 onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full accent-purple-500"
+                className="w-full accent-blue-500"
               />
               <div className="flex justify-between text-[9px] text-[var(--muted)]">
                 <span>1分钟</span>
@@ -616,7 +617,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
             {script.scenes.map((scene, i) => (
               <div key={i} className="p-2 rounded-lg bg-[var(--card)] border border-[var(--border)]">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[9px] bg-purple-500 text-white px-1.5 py-0.5 rounded">{i + 1}</span>
+                  <span className="text-[9px] bg-blue-500 text-white px-1.5 py-0.5 rounded">{i + 1}</span>
                   <span className="text-xs font-semibold">{scene.title}</span>
                   <span className="text-[9px] text-[var(--muted)] ml-auto">~{scene.duration}s</span>
                 </div>
@@ -743,10 +744,10 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
               <div className="rounded-lg overflow-hidden shadow-lg border border-[var(--border)]">
                 <Player
                   component={VideoComposition as unknown as React.ComponentType<Record<string, unknown>>}
-                  inputProps={{ script, ratio, colorTheme: theme, showSubtitles, watermarkText, subtitleStyle } as unknown as Record<string, unknown>}
+                  inputProps={{ script, ratio: ratios[0] || "9:16", colorTheme: theme, showSubtitles, watermarkText, subtitleStyle } as unknown as Record<string, unknown>}
                   durationInFrames={calculateTotalFrames(script)}
-                  compositionWidth={ratio === "9:16" ? 1080 : ratio === "1:1" ? 1080 : 1920}
-                  compositionHeight={ratio === "9:16" ? 1920 : ratio === "1:1" ? 1080 : 1080}
+                  compositionWidth={(ratios[0] || "9:16") === "9:16" ? 1080 : (ratios[0] || "9:16") === "1:1" ? 1080 : 1920}
+                  compositionHeight={(ratios[0] || "9:16") === "9:16" ? 1920 : (ratios[0] || "9:16") === "1:1" ? 1080 : 1080}
                   fps={30}
                   style={getPreviewSize()}
                   controls
@@ -756,7 +757,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
             </div>
 
             <div className="text-center text-[10px] text-[var(--muted)]">
-              {script.videoTitle} · {Math.round(script.totalDuration)}秒 · {ratio}
+              {script.videoTitle} · {Math.round(script.totalDuration)}秒 · {ratios.join("/")}
             </div>
 
             {/* 导出按钮 */}

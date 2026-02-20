@@ -287,10 +287,10 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
             <button
               key={s}
               onClick={() => {
-                setInput(s);
-                textareaRef.current?.focus();
+                if (disabled || isGenerating) return;
+                onSend(s);
               }}
-              className="px-3 sm:px-4 py-2 rounded-full border border-[var(--border)] hover:bg-[var(--sidebar-hover)] transition-colors text-xs sm:text-sm"
+              className="px-3 sm:px-4 py-2 rounded-full border border-[var(--border)] hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 transition-colors text-xs sm:text-sm"
             >
               {s}
             </button>

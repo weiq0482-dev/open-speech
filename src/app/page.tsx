@@ -755,14 +755,14 @@ function ChatApp() {
                 {useChatStore.getState().gems.length > 0 && (
                   <div className="bg-[var(--card)] rounded-2xl p-3 border border-[var(--border)] text-left max-w-2xl mx-auto">
                     <p className="text-xs font-medium mb-2 flex items-center gap-1.5">
-                      <IconMagicWand size={14} className="text-purple-500" />
-                      为你匹配的专家
+                      <IconMagicWand size={14} className="text-blue-500" />
+                      生成专家 · 默认知识库
                     </p>
                     <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
                       {useChatStore.getState().gems.slice(0, 6).map((gem) => (
                         <div
                           key={gem.id}
-                          className="p-1.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors text-center"
+                          className="p-1.5 rounded-xl bg-[var(--sidebar-hover)] cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors text-center"
                           onClick={() => {
                             const cid = createConversation(gem.id);
                             useChatStore.getState().setActiveGem(gem.id);

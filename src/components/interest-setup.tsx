@@ -107,8 +107,8 @@ export function InterestSetup({
           </p>
           {/* 步骤指示器 */}
           <div className="flex gap-1.5 mt-3">
-            <div className={cn("h-1 rounded-full flex-1 transition-colors", step >= 1 ? "bg-purple-500" : "bg-gray-200 dark:bg-gray-700")} />
-            <div className={cn("h-1 rounded-full flex-1 transition-colors", step >= 2 ? "bg-purple-500" : "bg-gray-200 dark:bg-gray-700")} />
+            <div className={cn("h-1 rounded-full flex-1 transition-colors", step >= 1 ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700")} />
+            <div className={cn("h-1 rounded-full flex-1 transition-colors", step >= 2 ? "bg-blue-500" : "bg-gray-200 dark:bg-gray-700")} />
           </div>
         </div>
 
@@ -125,11 +125,11 @@ export function InterestSetup({
                     className={cn(
                       "flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl border-2 transition-all",
                       isSelected
-                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 scale-[1.02]"
-                        : "border-[var(--border)] hover:border-purple-300 hover:bg-purple-50/50 dark:hover:bg-purple-900/10"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 scale-[1.02]"
+                        : "border-[var(--border)] hover:border-blue-300 hover:bg-blue-50/50 dark:hover:bg-blue-900/10"
                     )}
                   >
-                    <InterestIcon id={opt.id} size={22} className={isSelected ? "text-purple-600 dark:text-purple-300" : "text-[var(--muted)]"} />
+                    <InterestIcon id={opt.id} size={22} className={isSelected ? "text-blue-600 dark:text-blue-300" : "text-[var(--muted)]"} />
                     <span className="text-[11px] font-medium">{opt.label}</span>
                   </button>
                 );
@@ -146,7 +146,7 @@ export function InterestSetup({
                 onChange={(e) => setCustomInterests(e.target.value)}
                 placeholder="如：摄影后期、宠物养护、电商运营、短视频剪辑、游戏策划、烘焙..."
                 rows={2}
-                className="w-full px-3 py-2 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-purple-500 resize-none"
+                className="w-full px-3 py-2 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-500 resize-none"
               />
             </div>
 
@@ -179,7 +179,7 @@ export function InterestSetup({
                 className={cn(
                   "flex-1 flex items-center justify-center gap-1 px-4 py-2.5 rounded-xl text-white text-sm transition-colors",
                   hasInput
-                    ? "bg-purple-500 hover:bg-purple-600"
+                    ? "bg-blue-500 hover:bg-blue-600"
                     : "bg-gray-300 cursor-not-allowed"
                 )}
               >
@@ -201,7 +201,7 @@ export function InterestSetup({
                 value={profession}
                 onChange={(e) => setProfession(e.target.value)}
                 placeholder="如：前端开发、产品经理、大学教师、外贸业务员..."
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-purple-500"
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-500"
               />
             </div>
             <div>
@@ -213,12 +213,12 @@ export function InterestSetup({
                 value={researchDirection}
                 onChange={(e) => setResearchDirection(e.target.value)}
                 placeholder="如：用户增长、机器学习、跨境电商、新能源汽车..."
-                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-purple-500"
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border)] bg-transparent text-sm outline-none focus:border-blue-500"
               />
             </div>
 
-            <div className="p-3 rounded-xl bg-purple-50/50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800">
-              <p className="text-xs text-purple-700 dark:text-purple-300">
+            <div className="p-3 rounded-xl bg-blue-50/50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
                 💡 AI 会根据你填写的所有信息，自动生成 3~5 位专属专家，每位专家都有定制的专业提示词。
               </p>
             </div>
@@ -233,7 +233,7 @@ export function InterestSetup({
               <button
                 onClick={handleSubmit}
                 disabled={saving}
-                className="flex-1 flex items-center justify-center gap-1 px-4 py-2.5 rounded-xl bg-purple-500 text-white text-sm hover:bg-purple-600 disabled:bg-purple-300 transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
               >
                 {saving ? (
                   <>

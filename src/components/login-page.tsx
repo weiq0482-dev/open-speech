@@ -162,11 +162,9 @@ export function LoginPage() {
       {/* Logo */}
       <div className="mb-8 text-center">
         <div className="flex items-center justify-center gap-3 mb-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center shadow-lg">
-            <AppLogo size={32} white />
-          </div>
+          <AppLogo size={56} />
         </div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
           OpenSpeech
         </h1>
         <p className="text-sm text-[var(--muted)] mt-2">

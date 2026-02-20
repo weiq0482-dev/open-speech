@@ -47,7 +47,7 @@ export function NotebookStudio({
       {/* Header */}
       <div className="px-3 py-3 border-b border-[var(--border)] shrink-0">
         <div className="flex items-center gap-1.5">
-          <IconMagicWand size={14} className="text-purple-500" />
+          <IconMagicWand size={14} className="text-blue-500" />
           <h3 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
             Studio
           </h3>
@@ -83,7 +83,7 @@ export function NotebookStudio({
                   className={cn(
                     "rounded-lg border transition-all",
                     output
-                      ? "border-purple-200 dark:border-purple-800 bg-purple-50/30 dark:bg-purple-900/10"
+                      ? "border-blue-200 dark:border-blue-800 bg-blue-50/30 dark:bg-blue-900/10"
                       : "border-[var(--border)]"
                   )}
                 >
@@ -121,7 +121,7 @@ export function NotebookStudio({
                           "flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-medium transition-colors",
                           output
                             ? "text-[var(--muted)] hover:bg-[var(--sidebar-hover)]"
-                            : "bg-purple-500 text-white hover:bg-purple-600",
+                            : "bg-blue-500 text-white hover:bg-blue-600",
                           generatingStudio && "opacity-50 cursor-not-allowed"
                         )}
                       >
@@ -213,7 +213,7 @@ export function NotebookStudio({
         {enabledSources.length > 0 && (
           <div className="mt-3 border-t border-[var(--border)] pt-3">
             <div className="flex items-center gap-1.5 mb-2">
-              <Video size={14} className="text-purple-500" />
+              <Video size={14} className="text-blue-500" />
               <h4 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
                 AI 视频
               </h4>
@@ -226,17 +226,20 @@ export function NotebookStudio({
                 onClose={() => setShowVideo(false)}
               />
             ) : (
-              <button
-                onClick={() => setShowVideo(true)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[var(--border)] hover:border-purple-300 dark:hover:border-purple-700 hover:bg-purple-50/30 dark:hover:bg-purple-900/10 transition-all"
-              >
-                <Video size={14} className="text-purple-500" />
-                <div className="flex-1 text-left">
-                  <p className="text-[11px] font-medium">生成视频</p>
-                  <p className="text-[9px] text-[var(--muted)]">知识卡片 / 数字人口播 / 混合剪辑</p>
-                </div>
-                <ChevronRight size={12} className="text-[var(--muted)]" />
-              </button>
+              <>
+                <button
+                  onClick={() => setShowVideo(true)}
+                  className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[var(--border)] hover:border-blue-300 dark:hover:border-blue-700 hover:bg-blue-50/30 dark:hover:bg-blue-900/10 transition-all"
+                >
+                  <Video size={14} className="text-blue-500" />
+                  <div className="flex-1 text-left">
+                    <p className="text-[11px] font-medium">生成视频</p>
+                    <p className="text-[9px] text-[var(--muted)]">知识卡片 / 数字人口播 / 混合剪辑</p>
+                  </div>
+                  <ChevronRight size={12} className="text-[var(--muted)]" />
+                </button>
+                <p className="text-[9px] text-orange-500 mt-1.5 px-1">⏰ 生成的视频最多保留 90 天，请及时下载，到期自动清理</p>
+              </>
             )}
           </div>
         )}

@@ -391,6 +391,76 @@ const INTEREST_EXPERTS: Record<string, ExpertTemplate[]> = {
   ],
 };
 
+// ========== 职业 → 精准专家名号映射 ==========
+function getProfessionExpertTitle(profession: string): { name: string; icon: string } {
+  const p = profession.toLowerCase();
+  // 建筑/设计类
+  if (p.includes("建筑")) return { name: "建筑大师", icon: "🏛️" };
+  if (p.includes("室内设计") || p.includes("室内")) return { name: "室内设计师", icon: "🛋️" };
+  if (p.includes("景观")) return { name: "景观设计师", icon: "🌿" };
+  if (p.includes("规划") || p.includes("城市")) return { name: "城市规划师", icon: "🏙️" };
+  if (p.includes("ui") || p.includes("ux") || p.includes("交互")) return { name: "UX设计专家", icon: "🎨" };
+  if (p.includes("平面") || p.includes("视觉")) return { name: "视觉设计师", icon: "🖼️" };
+  // 医学/健康类
+  if (p.includes("医生") || p.includes("医师") || p.includes("临床")) return { name: "临床医学专家", icon: "🩺" };
+  if (p.includes("护士") || p.includes("护理")) return { name: "护理专家", icon: "💊" };
+  if (p.includes("中医")) return { name: "中医大夫", icon: "🌿" };
+  if (p.includes("牙") || p.includes("口腔")) return { name: "口腔医学专家", icon: "🦷" };
+  if (p.includes("心理") || p.includes("咨询师")) return { name: "心理咨询专家", icon: "🧠" };
+  if (p.includes("营养")) return { name: "营养学专家", icon: "🥗" };
+  // 法律类
+  if (p.includes("律师") || p.includes("法律") || p.includes("法务")) return { name: "法律顾问", icon: "⚖️" };
+  if (p.includes("法官") || p.includes("检察")) return { name: "司法实务专家", icon: "🏛️" };
+  // 金融/商业类
+  if (p.includes("会计") || p.includes("财务")) return { name: "财务专家", icon: "📊" };
+  if (p.includes("审计")) return { name: "审计专家", icon: "🔍" };
+  if (p.includes("基金") || p.includes("投资") || p.includes("证券")) return { name: "投资分析师", icon: "📈" };
+  if (p.includes("银行")) return { name: "金融专家", icon: "🏦" };
+  if (p.includes("保险")) return { name: "保险规划师", icon: "🛡️" };
+  if (p.includes("创业") || p.includes("ceo") || p.includes("创始人")) return { name: "创业导师", icon: "🚀" };
+  if (p.includes("产品经理") || p.includes("pm")) return { name: "产品专家", icon: "📋" };
+  if (p.includes("运营")) return { name: "运营专家", icon: "📱" };
+  if (p.includes("市场") || p.includes("营销")) return { name: "营销专家", icon: "📣" };
+  if (p.includes("销售")) return { name: "销售专家", icon: "💼" };
+  // 教育类
+  if (p.includes("教师") || p.includes("老师") || p.includes("教授")) return { name: "教育专家", icon: "📚" };
+  if (p.includes("校长")) return { name: "教育管理专家", icon: "🎓" };
+  if (p.includes("培训")) return { name: "培训导师", icon: "🎯" };
+  // 工程/技术类
+  if (p.includes("前端") || p.includes("后端") || p.includes("全栈")) return { name: "软件工程师", icon: "💻" };
+  if (p.includes("算法") || p.includes("ai") || p.includes("机器学习") || p.includes("人工智能")) return { name: "AI算法专家", icon: "🤖" };
+  if (p.includes("数据") || p.includes("大数据")) return { name: "数据科学家", icon: "📊" };
+  if (p.includes("安全") || p.includes("网络安全")) return { name: "网络安全专家", icon: "🔐" };
+  if (p.includes("运维") || p.includes("devops")) return { name: "运维架构师", icon: "⚙️" };
+  if (p.includes("嵌入式") || p.includes("硬件") || p.includes("电子")) return { name: "硬件工程师", icon: "🔧" };
+  if (p.includes("机械")) return { name: "机械工程师", icon: "⚙️" };
+  if (p.includes("土木") || p.includes("结构")) return { name: "结构工程师", icon: "🏗️" };
+  if (p.includes("化工") || p.includes("化学")) return { name: "化工专家", icon: "🧪" };
+  if (p.includes("电气") || p.includes("电力")) return { name: "电气工程师", icon: "⚡" };
+  if (p.includes("环境") || p.includes("环保")) return { name: "环境工程师", icon: "🌱" };
+  // 媒体/创意类
+  if (p.includes("记者") || p.includes("编辑") || p.includes("媒体")) return { name: "媒体专家", icon: "📰" };
+  if (p.includes("摄影")) return { name: "摄影大师", icon: "📷" };
+  if (p.includes("导演") || p.includes("影视")) return { name: "影视导演", icon: "🎬" };
+  if (p.includes("音乐") || p.includes("作曲") || p.includes("音频")) return { name: "音乐制作人", icon: "🎵" };
+  if (p.includes("写作") || p.includes("作家") || p.includes("文案")) return { name: "写作大师", icon: "✍️" };
+  if (p.includes("自媒体") || p.includes("博主") || p.includes("up主")) return { name: "自媒体专家", icon: "📱" };
+  // 科研类
+  if (p.includes("研究员") || p.includes("科研") || p.includes("博士")) return { name: "科研专家", icon: "🔬" };
+  if (p.includes("物理")) return { name: "物理学家", icon: "⚛️" };
+  if (p.includes("生物") || p.includes("生命科学")) return { name: "生物学家", icon: "🧬" };
+  if (p.includes("数学")) return { name: "数学专家", icon: "📐" };
+  // 其他专业
+  if (p.includes("厨师") || p.includes("烹饪")) return { name: "烹饪大师", icon: "👨‍🍳" };
+  if (p.includes("农业") || p.includes("农学")) return { name: "农业专家", icon: "🌾" };
+  if (p.includes("物流") || p.includes("供应链")) return { name: "供应链专家", icon: "📦" };
+  if (p.includes("人力") || p.includes("hr")) return { name: "人力资源专家", icon: "👥" };
+  if (p.includes("翻译")) return { name: "翻译专家", icon: "🌐" };
+  if (p.includes("体育") || p.includes("教练") || p.includes("运动")) return { name: "体育专家", icon: "🏅" };
+  // 默认：取职业名称直接加"专家"
+  return { name: `${profession}专家`, icon: "🎓" };
+}
+
 function generateExpertsForInterests(
   interests: string[],
   profession?: string,
@@ -409,13 +479,14 @@ function generateExpertsForInterests(
     }
   }
 
-  // 如果用户填了专业方向，生成一个定制专家
+  // 如果用户填了职业，按职业精准匹配专家名号
   if (profession) {
+    const expertTitle = getProfessionExpertTitle(profession);
     experts.push({
-      name: `${profession}专家`,
-      icon: "🎓",
+      name: expertTitle.name,
+      icon: expertTitle.icon,
       description: `${profession}领域的专业问答和指导`,
-      systemPrompt: `你是${profession}领域的资深专家，拥有丰富的理论知识和实践经验。请用专业且易懂的方式回答用户关于${profession}的问题。${researchDirection ? `用户当前的研究方向是：${researchDirection}，请在回答时优先考虑这个方向。` : ""}`,
+      systemPrompt: `你是${expertTitle.name}，在${profession}领域拥有深厚的专业知识和丰富的实践经验。请用专业且易懂的方式回答用户关于${profession}的问题，给出具体可操作的建议。${researchDirection ? `用户当前的研究方向是：${researchDirection}，请在回答时优先考虑这个方向。` : ""}`,
     });
   }
 
