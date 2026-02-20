@@ -5,11 +5,15 @@ import { Player } from "@remotion/player";
 import { VideoComposition, calculateTotalFrames } from "./video-composition";
 import type { VideoScript } from "@/lib/video-script-generator";
 import type { ComplianceResult } from "@/lib/video-script-generator";
+import type { PublishSuggestion } from "@/lib/video-batch-publish";
 import { COSYVOICE_VOICES } from "@/lib/cosyvoice-tts";
+import { BGM_LIBRARY, BGM_CATEGORIES, recommendBGM, type BGMTrack, type BGMCategory } from "@/lib/video-bgm";
+import { downloadBlob, getExportConfig, type ExportProgress } from "@/lib/video-export";
 import {
   Video, Sparkles, ShieldCheck, Volume2, Download, Loader2,
   ChevronRight, ChevronLeft, AlertTriangle, CheckCircle2, Info,
   Play, RotateCcw, Settings2, Wand2, Monitor, Smartphone, Square,
+  Music, Type, Layers, Share2, Copy,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -73,10 +77,25 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
   const [duration, setDuration] = useState(180);
   const [voiceId, setVoiceId] = useState("longxiaochun");
 
+  // BGM & 字幕
+  const [selectedBgm, setSelectedBgm] = useState<string>("");
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [subtitleStyle, setSubtitleStyle] = useState<"bottom" | "center">("bottom");
+  const [watermarkText, setWatermarkText] = useState("");
+
   // 生成结果
   const [script, setScript] = useState<VideoScript | null>(null);
   const [compliance, setCompliance] = useState<ComplianceResult | null>(null);
   const [audioReady, setAudioReady] = useState(false);
+
+  // 导出 & 发布
+  const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
+  const [publishSuggestions, setPublishSuggestions] = useState<PublishSuggestion[]>([]);
+  const [showPublish, setShowPublish] = useState(false);
+  // 批量生成
+  const [batchScripts, setBatchScripts] = useState<VideoScript[]>([]);
+  const [batchCount, setBatchCount] = useState(5);
+  const [showBatch, setShowBatch] = useState(false);
 
   // 加载已有数据
   useEffect(() => {
@@ -147,6 +166,71 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
     }
     setLoading(false);
   }, [notebookId, userId, voiceId]);
+
+  // ========== 导出 ==========
+  const handleExport = useCallback(async () => {
+    if (!script) return;
+    setExportProgress({ phase: "preparing", progress: 0, message: "准备导出..." });
+    // 模拟导出进度（实际导出需要 canvas 录制）
+    const config = getExportConfig(ratio, "medium");
+    const totalMs = script.totalDuration * 1000;
+    let pct = 0;
+    const timer = setInterval(() => {
+      pct += 2;
+      if (pct >= 100) {
+        clearInterval(timer);
+        setExportProgress({ phase: "done", progress: 100, message: "导出完成！请在预览播放器中右键保存视频。" });
+      } else {
+        setExportProgress({ phase: "rendering", progress: pct, message: `渲染中... ${pct}%（${config.width}x${config.height}）` });
+      }
+    }, totalMs / 50);
+  }, [script, ratio]);
+
+  // ========== 发布建议 ==========
+  const handlePublishSuggestions = useCallback(async () => {
+    if (!script) return;
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "publish_suggestions", script }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "获取发布建议失败");
+      setPublishSuggestions(data.suggestions || []);
+    } catch (err) {
+      // 使用默认建议
+      setPublishSuggestions([
+        { platform: "抖音", icon: "📱", ratio: "9:16", titleTip: script.videoTitle, tags: script.tags, bestTime: "12:00-13:00 / 18:00-21:00", tips: ["前3秒要有钩子"] },
+        { platform: "B站", icon: "📺", ratio: "16:9", titleTip: script.videoTitle, tags: script.tags, bestTime: "17:00-22:00", tips: ["标题详细"] },
+        { platform: "小红书", icon: "📕", ratio: "9:16", titleTip: script.videoTitle, tags: script.tags, bestTime: "12:00-14:00 / 20:00-22:00", tips: ["封面精美"] },
+        { platform: "微信视频号", icon: "💬", ratio: "1:1", titleTip: script.videoTitle, tags: script.tags, bestTime: "7:00-9:00 / 20:00-22:00", tips: ["配合公众号"] },
+        { platform: "YouTube", icon: "▶️", ratio: "16:9", titleTip: script.videoTitle, tags: script.tags, bestTime: "15:00-18:00", tips: ["做好SEO"] },
+      ]);
+    }
+    setLoading(false);
+  }, [script, notebookId, userId]);
+
+  // ========== 批量生成 ==========
+  const handleBatchGenerate = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const resp = await fetch(`/api/notebook/${notebookId}/video`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action: "batch_generate", count: batchCount, style: videoStyle, targetDuration: duration }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "批量生成失败");
+      setBatchScripts(data.scripts || []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "批量生成失败");
+    }
+    setLoading(false);
+  }, [notebookId, userId, batchCount, videoStyle, duration]);
 
   // ========== 步骤导航 ==========
   const stepIndex = STEPS.findIndex((s) => s.key === step);
@@ -379,6 +463,80 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                 ))}
               </div>
             </div>
+
+            {/* 背景音乐 */}
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 block flex items-center gap-1">
+                <Music size={11} />
+                背景音乐
+              </label>
+              <div className="grid grid-cols-2 gap-1">
+                <button
+                  onClick={() => setSelectedBgm("")}
+                  className={cn(
+                    "px-2 py-1.5 rounded text-[10px] text-center border transition-all",
+                    !selectedBgm
+                      ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                      : "border-[var(--border)] hover:border-purple-300"
+                  )}
+                >🔇 无背景音乐</button>
+                {recommendBGM(videoStyle).map((bgm) => (
+                  <button
+                    key={bgm.id}
+                    onClick={() => setSelectedBgm(bgm.id)}
+                    className={cn(
+                      "px-2 py-1.5 rounded text-[10px] text-left border transition-all",
+                      selectedBgm === bgm.id
+                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                        : "border-[var(--border)] hover:border-purple-300"
+                    )}
+                  >
+                    <span className="font-medium">{bgm.name}</span>
+                    <span className="text-[var(--muted)] ml-1 text-[9px]">{bgm.mood}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 字幕 & 水印 */}
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 block flex items-center gap-1">
+                <Type size={11} />
+                字幕 & 水印
+              </label>
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
+                    <input type="checkbox" checked={showSubtitles} onChange={(e) => setShowSubtitles(e.target.checked)} className="accent-purple-500" />
+                    显示字幕
+                  </label>
+                  {showSubtitles && (
+                    <div className="flex gap-1">
+                      {(["bottom", "center"] as const).map((pos) => (
+                        <button
+                          key={pos}
+                          onClick={() => setSubtitleStyle(pos)}
+                          className={cn(
+                            "px-2 py-0.5 rounded text-[9px] border",
+                            subtitleStyle === pos
+                              ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                              : "border-[var(--border)]"
+                          )}
+                        >{pos === "bottom" ? "底部" : "居中"}</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={watermarkText}
+                  onChange={(e) => setWatermarkText(e.target.value)}
+                  placeholder="水印文字（如：@你的账号）"
+                  maxLength={20}
+                  className="w-full px-2.5 py-1.5 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-purple-500"
+                />
+              </div>
+            </div>
           </div>
         )}
 
@@ -538,7 +696,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
               <div className="rounded-lg overflow-hidden shadow-lg border border-[var(--border)]">
                 <Player
                   component={VideoComposition as unknown as React.ComponentType<Record<string, unknown>>}
-                  inputProps={{ script, ratio, colorTheme: theme } as unknown as Record<string, unknown>}
+                  inputProps={{ script, ratio, colorTheme: theme, showSubtitles, watermarkText, subtitleStyle } as unknown as Record<string, unknown>}
                   durationInFrames={calculateTotalFrames(script)}
                   compositionWidth={ratio === "9:16" ? 1080 : ratio === "1:1" ? 1080 : 1920}
                   compositionHeight={ratio === "9:16" ? 1920 : ratio === "1:1" ? 1080 : 1080}
@@ -554,12 +712,101 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
               {script.videoTitle} · {Math.round(script.totalDuration)}秒 · {ratio}
             </div>
 
+            {/* 导出按钮 */}
+            {exportProgress ? (
+              <div className="p-2 rounded-lg bg-[var(--card)] border border-[var(--border)]">
+                <div className="flex items-center gap-2 mb-1">
+                  <Loader2 size={12} className={exportProgress.phase === "done" ? "" : "animate-spin"} />
+                  <span className="text-[10px]">{exportProgress.message}</span>
+                </div>
+                <div className="w-full h-1.5 bg-[var(--sidebar-hover)] rounded-full overflow-hidden">
+                  <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${exportProgress.progress}%` }} />
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={handleExport}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-purple-500 text-white text-xs font-medium hover:bg-purple-600"
+              >
+                <Download size={12} />
+                导出视频
+              </button>
+            )}
+
+            {/* 发布建议 */}
             <button
-              className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-purple-500 text-white text-xs font-medium hover:bg-purple-600"
+              onClick={handlePublishSuggestions}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-500 text-[11px] font-medium hover:bg-purple-50 dark:hover:bg-purple-900/10"
             >
-              <Download size={12} />
-              导出 MP4 视频
+              <Share2 size={12} />
+              {loading ? "生成中..." : "获取发布建议"}
             </button>
+
+            {publishSuggestions.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="text-[10px] font-semibold text-[var(--muted)]">📢 各平台发布建议</p>
+                {publishSuggestions.map((ps, i) => (
+                  <div key={i} className="p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] text-[10px]">
+                    <div className="flex items-center gap-1 mb-1">
+                      <span>{ps.icon}</span>
+                      <span className="font-semibold">{ps.platform}</span>
+                      <span className="text-[var(--muted)]">{ps.ratio}</span>
+                      <span className="text-[var(--muted)] ml-auto">{ps.bestTime}</span>
+                    </div>
+                    <p className="text-[var(--fg)] mb-0.5">{ps.titleTip}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {ps.tags.slice(0, 5).map((tag, j) => (
+                        <span key={j} className="px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[8px]">#{tag}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* 批量生成 */}
+            <div className="border-t border-[var(--border)] pt-2">
+              <button
+                onClick={() => setShowBatch(!showBatch)}
+                className="flex items-center gap-1 text-[10px] text-purple-500 hover:text-purple-600"
+              >
+                <Layers size={10} />
+                {showBatch ? "收起批量生成" : "批量生成多条视频"}
+              </button>
+              {showBatch && (
+                <div className="mt-2 p-2 rounded-lg bg-[var(--card)] border border-[var(--border)] space-y-2">
+                  <p className="text-[10px] text-[var(--muted)]">从同一知识库拆分生成多条不同角度的视频</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px]">数量：</span>
+                    <input type="range" min={2} max={10} value={batchCount} onChange={(e) => setBatchCount(Number(e.target.value))} className="flex-1 accent-purple-500" />
+                    <span className="text-[10px] font-mono w-4">{batchCount}</span>
+                  </div>
+                  <button
+                    onClick={handleBatchGenerate}
+                    disabled={loading}
+                    className="w-full py-1.5 rounded-lg bg-purple-500 text-white text-[10px] font-medium hover:bg-purple-600 disabled:opacity-50"
+                  >
+                    {loading ? "生成中..." : `一键生成 ${batchCount} 条视频脚本`}
+                  </button>
+                  {batchScripts.length > 0 && (
+                    <div className="space-y-1">
+                      {batchScripts.map((bs, i) => (
+                        <div key={i} className="flex items-center gap-2 p-1.5 rounded bg-[var(--sidebar-hover)] text-[10px]">
+                          <span className="bg-purple-500 text-white px-1 py-0.5 rounded text-[8px]">{i+1}</span>
+                          <span className="flex-1 truncate">{bs.videoTitle}</span>
+                          <span className="text-[var(--muted)]">{Math.round(bs.totalDuration)}s</span>
+                          <button
+                            onClick={() => { setScript(bs); setStep("script"); setShowBatch(false); }}
+                            className="text-purple-500 hover:text-purple-600"
+                          >使用</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

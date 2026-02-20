@@ -9,6 +9,9 @@ export interface VideoCompositionProps {
   script: VideoScript;
   ratio: "16:9" | "9:16" | "1:1";
   colorTheme?: "dark" | "light" | "blue" | "gradient";
+  showSubtitles?: boolean;
+  watermarkText?: string;
+  subtitleStyle?: "bottom" | "center";
 }
 
 const FPS = 30;
@@ -18,11 +21,25 @@ function getSceneFrames(scene: VideoScene): number {
   return Math.max((scene.duration || 5) * FPS, 3 * FPS);
 }
 
-export const VideoComposition: React.FC<VideoCompositionProps> = ({ script, ratio, colorTheme = "dark" }) => {
+export const VideoComposition: React.FC<VideoCompositionProps> = ({
+  script, ratio, colorTheme = "dark", showSubtitles = true, watermarkText, subtitleStyle = "bottom",
+}) => {
   const openingFrames = Math.max(estimateFrames(script.openingNarration), 3 * FPS);
   const closingFrames = Math.max(estimateFrames(script.closingNarration), 3 * FPS);
 
   let currentFrame = 0;
+
+  // 构建字幕时间轴
+  const subtitleTimeline: Array<{ from: number; dur: number; text: string }> = [];
+  let sf = 0;
+  subtitleTimeline.push({ from: sf, dur: openingFrames, text: script.openingNarration });
+  sf += openingFrames;
+  for (const scene of script.scenes) {
+    const dur = getSceneFrames(scene);
+    subtitleTimeline.push({ from: sf, dur, text: scene.narration });
+    sf += dur;
+  }
+  subtitleTimeline.push({ from: sf, dur: closingFrames, text: script.closingNarration });
 
   return (
     <AbsoluteFill style={{ backgroundColor: getThemeBg(colorTheme) }}>
@@ -61,6 +78,16 @@ export const VideoComposition: React.FC<VideoCompositionProps> = ({ script, rati
           theme={colorTheme}
         />
       </Sequence>
+
+      {/* 字幕叠加层 */}
+      {showSubtitles && subtitleTimeline.map((st, i) => (
+        <Sequence key={`sub-${i}`} from={st.from} durationInFrames={st.dur}>
+          <SubtitleOverlay text={st.text} position={subtitleStyle} />
+        </Sequence>
+      ))}
+
+      {/* 水印 */}
+      {watermarkText && <WatermarkOverlay text={watermarkText} />}
     </AbsoluteFill>
   );
 };
@@ -274,6 +301,84 @@ const ClosingSlide: React.FC<{ text: string; title: string; theme: string }> = (
       >
         {title} · 感谢观看
       </div>
+    </AbsoluteFill>
+  );
+};
+
+// ========== 字幕叠加层 ==========
+const SubtitleOverlay: React.FC<{ text: string; position: "bottom" | "center" }> = ({ text, position }) => {
+  const frame = useCurrentFrame();
+  const { fps, width } = useVideoConfig();
+  const opacity = interpolate(frame, [0, fps * 0.2], [0, 1], { extrapolateRight: "clamp" });
+
+  // 逐句显示：按标点符号拆分，每隔几秒切换
+  const sentences = text.split(/[，。！？；、,.\n]+/).filter((s) => s.trim());
+  const secondsPerSentence = Math.max(text.replace(/[\s\n]/g, "").length / 4 / Math.max(sentences.length, 1), 1.5);
+  const currentSentenceIdx = Math.min(
+    Math.floor(frame / (secondsPerSentence * fps)),
+    sentences.length - 1
+  );
+  const currentText = sentences[currentSentenceIdx] || "";
+
+  return (
+    <AbsoluteFill
+      style={{
+        display: "flex",
+        alignItems: position === "center" ? "center" : "flex-end",
+        justifyContent: "center",
+        padding: position === "center" ? "10%" : "5%",
+        paddingBottom: position === "bottom" ? "8%" : undefined,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          background: "rgba(0,0,0,0.65)",
+          borderRadius: 8,
+          padding: "8px 16px",
+          maxWidth: width * 0.85,
+          opacity,
+        }}
+      >
+        <p
+          style={{
+            color: "#fff",
+            fontSize: 20,
+            textAlign: "center",
+            lineHeight: 1.5,
+            margin: 0,
+            letterSpacing: 0.5,
+          }}
+        >
+          {currentText}
+        </p>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// ========== 水印叠加层 ==========
+const WatermarkOverlay: React.FC<{ text: string }> = ({ text }) => {
+  return (
+    <AbsoluteFill
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "flex-end",
+        padding: "3%",
+        pointerEvents: "none",
+      }}
+    >
+      <span
+        style={{
+          color: "rgba(255,255,255,0.3)",
+          fontSize: 12,
+          fontWeight: 500,
+          letterSpacing: 1,
+        }}
+      >
+        {text}
+      </span>
     </AbsoluteFill>
   );
 };

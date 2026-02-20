@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useChatStore } from "@/store/chat-store";
-import { X, User, Heart, Loader2, Check } from "lucide-react";
+import { X, User, Heart, Loader2, Check, Video, Upload, Mic, Volume2 } from "lucide-react";
 import { InterestIcon } from "@/components/app-icons";
 import {
   People,
@@ -69,7 +69,26 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
   const [localAvatar, setLocalAvatar] = useState(userAvatar || "people");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [tab, setTab] = useState<"profile" | "interests">("profile");
+  const [tab, setTab] = useState<"profile" | "interests" | "video">("profile");
+
+  // 视频/数字人设置
+  const [videoSettings, setVideoSettings] = useState({
+    voiceId: "longxiaochun",
+    voiceSpeed: 1.0,
+    cloneVoiceUrl: "",
+    voiceSampleUploaded: false,
+    avatarPhotoUrl: "",
+    avatarStyle: "formal" as "formal" | "casual" | "cartoon",
+    watermarkText: "",
+    openingTemplate: "",
+    closingTemplate: "",
+    defaultRatio: "9:16" as "16:9" | "9:16" | "1:1",
+    defaultTheme: "dark",
+    defaultStyle: "knowledge",
+  });
+  const [voiceSampleFile, setVoiceSampleFile] = useState<File | null>(null);
+  const [avatarPhotoFile, setAvatarPhotoFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -78,8 +97,15 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
       setLocalProfession(userProfession || "");
       setLocalAvatar(userAvatar || "people");
       setSaved(false);
+      // 加载视频设置
+      if (userId) {
+        fetch(`/api/video-settings?userId=${userId}`)
+          .then((r) => r.json())
+          .then((data) => { if (data.settings) setVideoSettings(data.settings); })
+          .catch(() => {});
+      }
     }
-  }, [open, userName, userInterests, userProfession, userAvatar]);
+  }, [open, userName, userInterests, userProfession, userAvatar, userId]);
 
 
   const toggleInterest = (id: string) => {
@@ -115,6 +141,13 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
         }),
       });
 
+      // 保存视频设置
+      await fetch("/api/video-settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, ...videoSettings }),
+      });
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch {}
@@ -142,6 +175,7 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
           {[
             { key: "profile" as const, icon: User, label: "基本信息" },
             { key: "interests" as const, icon: Heart, label: "兴趣爱好" },
+            { key: "video" as const, icon: Video, label: "数字人/视频" },
           ].map(({ key, icon: Icon, label }) => (
             <button
               key={key}
@@ -248,6 +282,194 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
                   已选择：{localInterests.join("、")}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Video/Digital Human Tab */}
+          {tab === "video" && (
+            <div className="space-y-5">
+              {/* 数字人形象照 */}
+              <div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-2 block flex items-center gap-1">
+                  <Upload size={12} />
+                  数字人形象照
+                </label>
+                <p className="text-[10px] text-[var(--muted)] mb-2">
+                  上传一张正面免冠照，用于生成数字人视频形象（建议512x512以上）
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-20 h-20 rounded-xl border-2 border-dashed border-[var(--border)] flex items-center justify-center overflow-hidden bg-[var(--sidebar-hover)]">
+                    {avatarPreview || videoSettings.avatarPhotoUrl ? (
+                      <img
+                        src={avatarPreview || videoSettings.avatarPhotoUrl}
+                        alt="avatar"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User size={24} className="text-[var(--muted)] opacity-40" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-blue-300 cursor-pointer text-xs transition-colors">
+                      <Upload size={12} />
+                      选择照片
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            setAvatarPhotoFile(file);
+                            setAvatarPreview(URL.createObjectURL(file));
+                          }
+                        }}
+                      />
+                    </label>
+                    {avatarPhotoFile && (
+                      <p className="text-[10px] text-green-500 mt-1">已选择：{avatarPhotoFile.name}</p>
+                    )}
+                  </div>
+                </div>
+                {/* 形象风格 */}
+                <div className="flex gap-2 mt-2">
+                  {(["formal", "casual", "cartoon"] as const).map((style) => (
+                    <button
+                      key={style}
+                      onClick={() => setVideoSettings((s) => ({ ...s, avatarStyle: style }))}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-[10px] border transition-colors",
+                        videoSettings.avatarStyle === style
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                          : "border-[var(--border)] hover:border-blue-300"
+                      )}
+                    >
+                      {style === "formal" ? "🤵 正式" : style === "casual" ? "👕 休闲" : "🎭 卡通"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 声音样本 */}
+              <div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-2 block flex items-center gap-1">
+                  <Mic size={12} />
+                  声音克隆（可选）
+                </label>
+                <p className="text-[10px] text-[var(--muted)] mb-2">
+                  上传 3-5 分钟的朗读录音，AI 将克隆你的声音用于视频配音
+                </p>
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-blue-300 cursor-pointer text-xs transition-colors">
+                  <Mic size={12} />
+                  上传声音样本
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setVoiceSampleFile(file);
+                        setVideoSettings((s) => ({ ...s, voiceSampleUploaded: true }));
+                      }
+                    }}
+                  />
+                </label>
+                {voiceSampleFile && (
+                  <p className="text-[10px] text-green-500 mt-1">已选择：{voiceSampleFile.name}</p>
+                )}
+                {videoSettings.voiceSampleUploaded && !voiceSampleFile && (
+                  <p className="text-[10px] text-blue-500 mt-1">已上传声音样本</p>
+                )}
+              </div>
+
+              {/* 默认配音声音 */}
+              <div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-2 block flex items-center gap-1">
+                  <Volume2 size={12} />
+                  默认配音声音
+                </label>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { id: "longxiaochun", name: "龙小淳", desc: "温柔知性 ★" },
+                    { id: "longlaotie", name: "龙老铁", desc: "成熟稳重 ★" },
+                    { id: "longshu", name: "龙叔", desc: "磁性低沉" },
+                    { id: "longxiaoxia", name: "龙小夏", desc: "活泼甜美" },
+                    { id: "longyue", name: "龙悦", desc: "新闻播报" },
+                    { id: "longcheng", name: "龙城", desc: "新闻播报" },
+                  ].map((v) => (
+                    <button
+                      key={v.id}
+                      onClick={() => setVideoSettings((s) => ({ ...s, voiceId: v.id }))}
+                      className={cn(
+                        "px-2 py-1.5 rounded-lg text-[10px] text-left border transition-colors",
+                        videoSettings.voiceId === v.id
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                          : "border-[var(--border)] hover:border-blue-300"
+                      )}
+                    >
+                      <span className="font-medium">{v.name}</span>
+                      <span className="text-[var(--muted)] ml-1">{v.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 语速 */}
+              <div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-2 block">
+                  语速：{videoSettings.voiceSpeed.toFixed(1)}x
+                </label>
+                <input
+                  type="range"
+                  min={0.5}
+                  max={2.0}
+                  step={0.1}
+                  value={videoSettings.voiceSpeed}
+                  onChange={(e) => setVideoSettings((s) => ({ ...s, voiceSpeed: parseFloat(e.target.value) }))}
+                  className="w-full accent-blue-500"
+                />
+                <div className="flex justify-between text-[9px] text-[var(--muted)]">
+                  <span>慢 0.5x</span>
+                  <span>正常 1.0x</span>
+                  <span>快 2.0x</span>
+                </div>
+              </div>
+
+              {/* 水印 */}
+              <div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-1.5 block">视频水印/署名</label>
+                <input
+                  type="text"
+                  value={videoSettings.watermarkText}
+                  onChange={(e) => setVideoSettings((s) => ({ ...s, watermarkText: e.target.value }))}
+                  placeholder="如：@你的账号名"
+                  maxLength={30}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500"
+                />
+              </div>
+
+              {/* 开场白/结束语模板 */}
+              <div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-1.5 block">默认开场白</label>
+                <textarea
+                  value={videoSettings.openingTemplate}
+                  onChange={(e) => setVideoSettings((s) => ({ ...s, openingTemplate: e.target.value }))}
+                  placeholder="如：大家好，我是XXX，今天给大家分享..."
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500 resize-none"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-1.5 block">默认结束语</label>
+                <textarea
+                  value={videoSettings.closingTemplate}
+                  onChange={(e) => setVideoSettings((s) => ({ ...s, closingTemplate: e.target.value }))}
+                  placeholder="如：如果觉得有帮助，记得点赞关注哦~"
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500 resize-none"
+                />
+              </div>
             </div>
           )}
 

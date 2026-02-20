@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRedis, isValidUserId, NB_PREFIX } from "@/lib/notebook-utils";
 import { generateVideoScript, checkCompliance, type VideoScript, type VideoStyle } from "@/lib/video-script-generator";
+import { batchGenerateScripts, generatePublishSuggestions } from "@/lib/video-batch-publish";
 import { canUse, deductQuota } from "@/lib/quota-store";
 
 const NB_VIDEO = "nb_video:";
@@ -8,7 +9,8 @@ const NB_VIDEO = "nb_video:";
 // POST: 生成视频脚本 / 合规检查
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const { userId, action, style, targetDuration } = await req.json();
+    const body = await req.json();
+    const { userId, action, style, targetDuration, count } = body;
     if (!userId || !isValidUserId(userId)) {
       return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
     }
@@ -105,6 +107,38 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       deductQuota(userId, "chat").catch((err) => console.error("[Video audio deductQuota]", err));
 
       return NextResponse.json({ success: true, audio: audioResults });
+    }
+
+    // ========== 批量生成 ==========
+    if (action === "batch_generate") {
+
+      const check = await canUse(userId, "chat");
+      if (!check.allowed) {
+        return NextResponse.json({ error: check.reason || "额度不足", quotaExhausted: true }, { status: 429 });
+      }
+
+      const result = await batchGenerateScripts({
+        notebookId,
+        count,
+        style: (style as string) || "knowledge",
+        targetDuration: targetDuration || 180,
+      });
+
+      await redis.set(`${NB_VIDEO}${notebookId}:batch`, result.scripts);
+      deductQuota(userId, "chat").catch((err) => console.error("[Video batch deductQuota]", err));
+
+      return NextResponse.json({ success: true, scripts: result.scripts, suggestions: result.suggestions });
+    }
+
+    // ========== 发布建议 ==========
+    if (action === "publish_suggestions") {
+      const scriptData = await redis.get<VideoScript>(`${NB_VIDEO}${notebookId}:script`);
+      if (!scriptData) {
+        return NextResponse.json({ error: "请先生成视频脚本" }, { status: 400 });
+      }
+
+      const suggestions = await generatePublishSuggestions(scriptData);
+      return NextResponse.json({ success: true, suggestions });
     }
 
     return NextResponse.json({ error: "未知操作" }, { status: 400 });
