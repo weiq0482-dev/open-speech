@@ -2,9 +2,13 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useNotebookStore, DiscussMessage } from "@/store/notebook-store";
-import { Bot, Send, User, MessageSquareMore, Loader2, Image as ImageIcon, BookmarkPlus } from "lucide-react";
+import { Bot, Send, User, MessageSquareMore, Loader2, Image as ImageIcon, BookmarkPlus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 
 export function NotebookChat({
   notebookId,
@@ -21,6 +25,8 @@ export function NotebookChat({
     middleTab,
     setMiddleTab,
     sources,
+    clearChatMessages,
+    clearDiscussMessages,
   } = useNotebookStore();
 
   const [input, setInput] = useState("");
@@ -71,6 +77,25 @@ export function NotebookChat({
           <MessageSquareMore size={14} />
           讨论组
         </button>
+        {/* 清空按钮 */}
+        {middleTab === "ai" && chatMessages.length > 0 && (
+          <button
+            onClick={() => { if (confirm("清空所有 AI 分析记录？")) clearChatMessages?.(); }}
+            className="px-2 py-2 text-[var(--muted)] hover:text-red-500 transition-colors"
+            title="清空 AI 分析"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
+        {middleTab === "discuss" && (
+          <button
+            onClick={() => { if (confirm("清空讨论组消息？")) clearDiscussMessages?.(); }}
+            className="px-2 py-2 text-[var(--muted)] hover:text-red-500 transition-colors"
+            title="清空讨论组"
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
 
       {middleTab === "ai" ? (
@@ -123,8 +148,28 @@ export function NotebookChat({
                       )}
                     >
                       {msg.role === "model" ? (
-                        <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                          <ReactMarkdown>{msg.content}</ReactMarkdown>
+                        <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 [&_p]:leading-relaxed">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm, remarkMath]}
+                            rehypePlugins={[rehypeKatex]}
+                            components={{
+                              p: ({ children }) => {
+                                const text = String(children);
+                                // 将【来源: ...】标注替换为小斜体灰色
+                                const parts = text.split(/(【来源[：:][^】]*】)/g);
+                                if (parts.length === 1) return <p>{children}</p>;
+                                return (
+                                  <p>
+                                    {parts.map((part, i) =>
+                                      /^【来源[：:]/.test(part)
+                                        ? <em key={i} className="text-[10px] not-italic text-[var(--muted)] font-normal opacity-70">{part}</em>
+                                        : part
+                                    )}
+                                  </p>
+                                );
+                              },
+                            }}
+                          >{msg.content}</ReactMarkdown>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -146,7 +191,7 @@ export function NotebookChat({
                     </div>
                     <div className="max-w-[80%] rounded-2xl rounded-bl-md bg-[var(--sidebar-hover)] px-3.5 py-2.5 text-sm">
                       <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                        <ReactMarkdown>{streamingResponse}</ReactMarkdown>
+                        <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{streamingResponse}</ReactMarkdown>
                       </div>
                     </div>
                   </div>

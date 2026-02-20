@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
           admin: {
             username: "super_admin",
             role: "super",
-            permissions: ["coupons", "messages", "users", "settings", "admins"],
+            permissions: ["messages", "users", "coupons", "settings", "trash", "admins", "monitor"],
           },
         });
       }

@@ -70,7 +70,7 @@ export interface Conversation {
   gemId?: string;
 }
 
-export type ToolMode = "none" | "deep-think" | "deep-research" | "image-gen" | "canvas" | "tutor" | "code-assist" | "notebook";
+export type ToolMode = "none" | "deep-think" | "deep-research" | "image-gen" | "mind-map" | "canvas" | "tutor" | "code-assist" | "notebook";
 
 // ========== 预置 Gem ==========
 const BUILTIN_GEMS: Gem[] = [
@@ -183,6 +183,11 @@ interface ChatState {
   authToken: string;
   userEmail: string;
   authMode: "email" | "device" | "";
+  // 用户个人信息
+  userName: string;
+  userInterests: string[];
+  userProfession: string;
+  userAvatar: string;
 
   // Actions
   createConversation: (gemId?: string) => string;
@@ -216,6 +221,9 @@ interface ChatState {
   login: (token: string, email: string, userId: string) => void;
   loginAsDevice: (userId: string) => void;
   logout: () => void;
+  // 用户个人信息
+  setUserName: (name: string) => void;
+  setUserProfile: (profile: { userName?: string; userInterests?: string[]; userProfession?: string; userAvatar?: string }) => void;
 }
 
 export const useChatStore = create<ChatState>()(
@@ -239,6 +247,10 @@ export const useChatStore = create<ChatState>()(
   authToken: "",
   userEmail: "",
   authMode: "" as "email" | "device" | "",
+  userName: "",
+  userInterests: [] as string[],
+  userProfession: "",
+  userAvatar: "",
 
   createConversation: (gemId?: string) => {
     const id = generateId();
@@ -389,6 +401,8 @@ export const useChatStore = create<ChatState>()(
   login: (token, email, userId) => set({ authToken: token, userEmail: email, userId, authMode: "email" }),
   loginAsDevice: (userId) => set({ userId, authMode: "device" }),
   logout: () => set({ authToken: "", userEmail: "", authMode: "" }),
+  setUserName: (name: string) => set({ userName: name }),
+  setUserProfile: (profile: { userName?: string; userInterests?: string[]; userProfession?: string; userAvatar?: string }) => set(profile),
   clearAllConversations: () =>
     set({ conversations: [], activeConversationId: null }),
 }),
@@ -427,6 +441,10 @@ export const useChatStore = create<ChatState>()(
         authToken: state.authToken,
         userEmail: state.userEmail,
         authMode: state.authMode,
+        userName: state.userName,
+        userInterests: state.userInterests,
+        userProfession: state.userProfession,
+        userAvatar: state.userAvatar,
       }),
       onRehydrateStorage: () => (state) => {
         if (!state) return;

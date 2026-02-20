@@ -127,7 +127,152 @@ export async function* transformQwenStream(response: Response): AsyncGenerator<s
   }
 }
 
-// 通义千问不支持原生图片生成，返回提示
+// DashScope 文生图 API（异步任务模式）
+export async function handleQwenImageGen(
+  apiKey: string,
+  messages: Array<{ role: string; content: string; attachments?: Array<{ mimeType: string; url: string }> }>
+): Promise<Response> {
+  const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
+  const rawPrompt = lastUserMsg?.content || "一幅美丽的风景画";
+
+  // 增强提示词：强制中文内容 + 检测脑图/思维导图关键词自动添加插画风格
+  const isMindMap = /脑图|思维导图|mind\s*map|知识图谱|概念图/i.test(rawPrompt);
+  let enhancedPrompt = rawPrompt;
+  if (isMindMap) {
+    enhancedPrompt = `${rawPrompt}，插画风格，可爱卡通手绘风，彩色圆形气泡节点，配有小图标和emoji表情，所有文字必须使用中文，背景浅色干净，色彩丰富明亮，高清细节`;
+  } else if (!/英文|english/i.test(rawPrompt)) {
+    // 非明确要求英文时，默认添加中文要求
+    enhancedPrompt = `${rawPrompt}，图中所有文字使用中文`;
+  }
+
+  // 检查是否有图片附件（图片编辑模式）
+  const hasImageAttachment = lastUserMsg?.attachments?.some(
+    (att) => att.mimeType.startsWith("image/")
+  );
+
+  // 选择模型：文生图用 wanx2.1-t2i-plus（DashScope 异步任务 API 支持的最佳模型）
+  const model = "wanx2.1-t2i-plus";
+
+  // 构建请求体
+  const requestBody: Record<string, unknown> = {
+    model,
+    input: { prompt: enhancedPrompt },
+    parameters: {
+      size: "1024*1024",
+      n: 1,
+    },
+  };
+
+  // 如果有图片附件，加入参考图片（图生图）
+  if (hasImageAttachment && lastUserMsg?.attachments) {
+    const imageAtt = lastUserMsg.attachments.find((att) => att.mimeType.startsWith("image/"));
+    if (imageAtt) {
+      requestBody.input = {
+        prompt: rawPrompt,
+        base_image_url: imageAtt.url,
+      };
+    }
+  }
+
+  try {
+    // Step 1: 提交异步任务
+    const submitResp = await fetch(
+      "https://dashscope.aliyuncs.com/api/v1/services/aigc/text2image/image-synthesis",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+          "X-DashScope-Async": "enable",
+        },
+        body: JSON.stringify(requestBody),
+      }
+    );
+
+    if (!submitResp.ok) {
+      const errText = await submitResp.text();
+      console.error("[Qwen ImageGen] Submit failed:", submitResp.status, errText);
+      return new Response(
+        JSON.stringify({ error: `图片生成失败: ${submitResp.status}`, details: errText }),
+        { status: submitResp.status, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const submitData = await submitResp.json();
+    const taskId = submitData.output?.task_id;
+    if (!taskId) {
+      return new Response(
+        JSON.stringify({ error: "图片生成任务创建失败" }),
+        { headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("[Qwen ImageGen] Task submitted:", taskId);
+
+    // Step 2: 轮询等待结果（最多 60 秒）
+    const maxWaitMs = 60000;
+    const pollInterval = 2500;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitMs) {
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+      const pollResp = await fetch(
+        `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
+        { headers: { Authorization: `Bearer ${apiKey}` } }
+      );
+
+      if (!pollResp.ok) continue;
+
+      const pollData = await pollResp.json();
+      const status = pollData.output?.task_status;
+
+      if (status === "SUCCEEDED") {
+        const results = pollData.output?.results || [];
+        const images = results
+          .filter((r: { url?: string }) => r.url)
+          .map((r: { url: string }) => r.url);
+
+        if (images.length === 0) {
+          return new Response(
+            JSON.stringify({ error: "未能生成图片，请尝试不同的描述" }),
+            { headers: { "Content-Type": "application/json" } }
+          );
+        }
+
+        console.log("[Qwen ImageGen] Success, images:", images.length);
+        return new Response(
+          JSON.stringify({ text: "已为您生成图片：", images }),
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      if (status === "FAILED") {
+        const errMsg = pollData.output?.message || "图片生成失败";
+        console.error("[Qwen ImageGen] Task failed:", errMsg);
+        return new Response(
+          JSON.stringify({ error: errMsg }),
+          { headers: { "Content-Type": "application/json" } }
+        );
+      }
+
+      // PENDING / RUNNING → 继续轮询
+    }
+
+    return new Response(
+      JSON.stringify({ error: "图片生成超时，请稍后重试" }),
+      { status: 504, headers: { "Content-Type": "application/json" } }
+    );
+  } catch (err) {
+    console.error("[Qwen ImageGen] Error:", err);
+    return new Response(
+      JSON.stringify({ error: `图片生成异常: ${err instanceof Error ? err.message : "未知错误"}` }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
+}
+
+// 保留兼容（已废弃）
 export function qwenImageGenNotSupported(): string {
   return "⚠️ 通义千问模式暂不支持图片生成功能。请切换到 Gemini 模式或使用文字对话。";
 }

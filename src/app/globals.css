@@ -34,6 +34,8 @@
 
 html {
   color-scheme: light;
+  overflow: hidden;
+  height: 100%;
 }
 
 html.dark {
@@ -46,6 +48,8 @@ body {
   font-family: "Google Sans", "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  height: 100%;
 }
 
 /* Scrollbar */

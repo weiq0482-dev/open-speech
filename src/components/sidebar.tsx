@@ -23,9 +23,11 @@ import {
   LogOut,
   Mail,
   BookOpen,
+  Settings,
 } from "lucide-react";
 import { AuthDialog } from "./auth-dialog";
 import { NotebookList } from "./notebook/notebook-list";
+import { UserSettings } from "./user-settings";
 
 interface ContactMsg {
   id: string;
@@ -203,6 +205,7 @@ export function Sidebar() {
     userId,
     authToken,
     userEmail,
+    authMode,
     logout: doLogout,
   } = useChatStore();
 
@@ -221,7 +224,8 @@ export function Sidebar() {
   const [siteConfig, setSiteConfig] = useState<{ contactQrUrl?: string; contactWechatId?: string } | null>(null);
   const [showAuth, setShowAuth] = useState(false);
   const [showKnowledge, setShowKnowledge] = useState(false);
-  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; dailyFreeUsed: number; freeDailyLimit: number; modelProvider?: string } | null>(null);
+  const [showUserSettings, setShowUserSettings] = useState(false);
+  const [quotaInfo, setQuotaInfo] = useState<{ plan: string; dailyFreeUsed: number; freeDailyLimit: number; modelProvider?: string; chatRemaining?: number; imageRemaining?: number; expiresAt?: string | null } | null>(null);
 
   useEffect(() => {
     fetch("/api/site-config").then(r => r.json()).then(d => setSiteConfig(d.config)).catch(() => {});
@@ -238,7 +242,10 @@ export function Sidebar() {
           plan: data.quota.plan || "free",
           dailyFreeUsed: data.quota.dailyFreeUsed || 0,
           freeDailyLimit: data.quota.freeDailyLimit || 5,
-          modelProvider: data.quota.modelProvider || "gemini",
+          modelProvider: data.quota.modelProvider || "qwen",
+          chatRemaining: data.quota.chatRemaining,
+          imageRemaining: data.quota.imageRemaining,
+          expiresAt: data.quota.expiresAt,
         });
       }
     } catch {}
@@ -410,7 +417,7 @@ export function Sidebar() {
             </button>
           </div>
 
-          {/* 免费用户今日剩余次数 */}
+          {/* 用户剩余额度 */}
           {quotaInfo && quotaInfo.plan === "free" && (
             <div className="px-3 py-2 rounded-xl bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border border-blue-200 dark:border-blue-800">
               <div className="flex items-center justify-between mb-0.5">
@@ -428,6 +435,33 @@ export function Sidebar() {
               <p className="text-[10px] text-blue-600/60 dark:text-blue-400/60 mt-0.5">
                 生图消耗2次 · 每日0点重置
               </p>
+            </div>
+          )}
+          {quotaInfo && quotaInfo.plan !== "free" && (
+            <div className="px-3 py-2 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border border-green-200 dark:border-green-800">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-medium text-green-700 dark:text-green-300">套餐额度</span>
+                <Zap size={14} className="text-green-500" />
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                    {quotaInfo.chatRemaining ?? 0}
+                  </div>
+                  <div className="text-[10px] text-green-600/60 dark:text-green-400/60">对话次数</div>
+                </div>
+                <div className="flex-1">
+                  <div className="text-lg font-bold text-green-600 dark:text-green-400">
+                    {quotaInfo.imageRemaining ?? 0}
+                  </div>
+                  <div className="text-[10px] text-green-600/60 dark:text-green-400/60">生图次数</div>
+                </div>
+              </div>
+              {quotaInfo.expiresAt && (
+                <p className="text-[10px] text-green-600/60 dark:text-green-400/60 mt-1">
+                  到期：{new Date(quotaInfo.expiresAt).toLocaleDateString("zh-CN")}
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -625,6 +659,15 @@ export function Sidebar() {
             )}
           </button>
 
+          {/* 个人设置 */}
+          <button
+            onClick={() => setShowUserSettings(true)}
+            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm"
+          >
+            <Settings size={18} />
+            <span>个人设置</span>
+          </button>
+
           {/* 登录/账户 */}
           {userEmail ? (
             <div className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm">
@@ -636,6 +679,17 @@ export function Sidebar() {
                 title="退出登录"
               >
                 <LogOut size={14} />
+              </button>
+            </div>
+          ) : authMode === "device" ? (
+            <div className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm">
+              <Zap size={18} className="text-green-500 shrink-0" />
+              <span className="text-xs text-[var(--muted)]">设备已登录</span>
+              <button
+                onClick={() => setShowAuth(true)}
+                className="ml-auto text-xs text-blue-500 hover:underline"
+              >
+                绑定邮箱
               </button>
             </div>
           ) : (
@@ -741,6 +795,9 @@ export function Sidebar() {
           contactWechatId={siteConfig?.contactWechatId}
         />
       )}
+
+      {/* 用户设置弹窗 */}
+      <UserSettings open={showUserSettings} onClose={() => setShowUserSettings(false)} />
     </>
   );
 }

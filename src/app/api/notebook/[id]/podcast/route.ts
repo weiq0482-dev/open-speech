@@ -71,10 +71,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     let script: string;
     try {
       script = await callAI({
-        systemPrompt: prompt,
+        systemPrompt: prompt + "\n\n**重要：无论资料是什么语言，脚本必须全部使用中文。** 如果资料是英文或其他语言，请翻译成中文后编写。",
         contents: [{
           role: "user",
-          parts: [{ text: `以下是知识库的资料，请生成播客脚本：\n\n${sourceTexts.slice(0, 50000)}` }],
+          parts: [{ text: `以下是知识库的资料，请用中文生成播客脚本：\n\n${sourceTexts.slice(0, 50000)}` }],
         }],
         temperature: 0.9,
         maxOutputTokens: 8192,
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       segments = [{ speaker: "Narrator", text: script, voice: voice || VOICES.female1 }];
     }
 
-    // 保存播客数据
+    // 保存播客数据（按模式分开存储，避免互相覆盖）
     const podcast = {
       mode: podcastMode,
       script,
@@ -122,6 +122,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       voices: VOICES,
       generatedAt: new Date().toISOString(),
     };
+    await redis.set(`${NB_PODCAST}${notebookId}:${podcastMode}`, podcast);
+    // 同时更新默认 key（向后兼容）
     await redis.set(`${NB_PODCAST}${notebookId}`, podcast);
 
     return NextResponse.json({ success: true, podcast });
@@ -140,8 +142,18 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const redis = getRedis();
+    // 返回两种模式的数据
+    const [narration, dialogue] = await Promise.all([
+      redis.get(`${NB_PODCAST}${params.id}:narration`),
+      redis.get(`${NB_PODCAST}${params.id}:dialogue`),
+    ]);
     const podcast = await redis.get(`${NB_PODCAST}${params.id}`);
-    return NextResponse.json({ podcast: podcast || null, voices: VOICES });
+    return NextResponse.json({
+      podcast: podcast || null,
+      podcastNarration: narration || null,
+      podcastDialogue: dialogue || null,
+      voices: VOICES,
+    });
   } catch (err) {
     console.error("[GET /api/notebook/[id]/podcast]", err);
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });

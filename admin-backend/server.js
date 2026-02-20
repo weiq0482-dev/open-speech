@@ -343,14 +343,15 @@ app.post("/api/users/unlock", async (req, res) => {
   }
 });
 
-// 查询单个用户详情（配额+设备+锁定状态）
+// 查询单个用户详情（配额+设备+锁定状态+个人资料）
 app.get("/api/users/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
     const quota = await redis.get(`${QUOTA_PREFIX}${userId}`);
     const locked = await redis.get(`locked:${userId}`);
     const usageLog = await redis.get(`usage_log:${userId}`) || [];
-    res.json({ userId, quota, locked, usageLog });
+    const profile = await redis.get(`${PROFILE_PREFIX}${userId}`) || {};
+    res.json({ userId, quota, locked, usageLog, profile });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

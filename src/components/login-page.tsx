@@ -232,10 +232,13 @@ export function LoginPage() {
               ) : (
                 <>
                   <Smartphone size={16} />
-                  使用当前设备登录
+                  设备快捷登录
                 </>
               )}
             </button>
+            <p className="text-[10px] text-[var(--muted)] text-center -mt-1">
+              仅限已绑定邮箱的设备使用
+            </p>
 
             <p className="text-[10px] text-[var(--muted)] text-center">
               登录即表示同意{" "}

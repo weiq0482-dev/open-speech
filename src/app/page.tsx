@@ -144,6 +144,7 @@ function ChatApp() {
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const activeConv = getActiveConversation();
   const [showInterestSetup, setShowInterestSetup] = useState(false);
@@ -218,6 +219,7 @@ function ChatApp() {
     return () => clearInterval(timer);
   }, [userId]);
   const [showPromo, setShowPromo] = useState(false);
+  const [showAdPaywall, setShowAdPaywall] = useState(false);
   const [shareCode, setShareCode] = useState<string | null>(null);
   const [shareStats, setShareStats] = useState<{ claimedCount: number; totalRewards: number } | null>(null);
   const [shareCopied, setShareCopied] = useState(false);
@@ -276,9 +278,14 @@ function ChatApp() {
     });
   };
 
-  // Scroll to bottom
+  // Scroll to bottom — 直接操作滚动容器，避免 scrollIntoView 滚动整个页面
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const container = chatContainerRef.current;
+    if (container) {
+      requestAnimationFrame(() => {
+        container.scrollTop = container.scrollHeight;
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -303,11 +310,14 @@ function ChatApp() {
         updateConversationTitle(convId, title);
       }
 
+      // 读取最新的 activeTool（mind-map 在 chat-input 中已切换为 image-gen）
+      const currentTool = useChatStore.getState().activeTool;
+
       const assistantMsgId = addMessage(convId, {
         role: "assistant",
         content: "",
         isStreaming: true,
-        toolUsed: activeTool !== "none" ? activeTool : undefined,
+        toolUsed: currentTool !== "none" ? currentTool : undefined,
       });
 
       setIsGenerating(true);
@@ -343,7 +353,7 @@ function ChatApp() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             messages: apiMessages,
-            tool: activeTool,
+            tool: currentTool,
             gemSystemPrompt: gem?.systemPrompt,
             generationConfig,
             customSystemInstruction: customSystemInstruction || undefined,
@@ -364,19 +374,21 @@ function ChatApp() {
           updateMessage(convId!, assistantMsgId, { content: isQuotaIssue ? "" : `⚠️ ${errorMsg}` });
           setMessageStreaming(convId!, assistantMsgId, false);
           setIsGenerating(false);
+          scrollToBottom();
           if (isQuotaIssue) setShowPromo(true);
           return;
 
         }
 
         // === Image generation: non-streaming JSON response ===
-        if (activeTool === "image-gen") {
+        if (currentTool === "image-gen" || currentTool === "mind-map") {
           const data = await response.json();
           if (data.error) {
             updateMessage(convId!, assistantMsgId, { content: `⚠️ ${data.error}` });
           } else {
+            const defaultText = currentTool === "mind-map" ? "已为您生成脑图：" : "已为您生成图片：";
             updateMessage(convId!, assistantMsgId, {
-              content: data.text || "图片已生成：",
+              content: data.text || defaultText,
               generatedImages: data.images || [],
             });
             // 通知 Sidebar 刷新配额
@@ -384,6 +396,7 @@ function ChatApp() {
           }
           setMessageStreaming(convId!, assistantMsgId, false);
           setIsGenerating(false);
+          scrollToBottom();
           return;
         }
 
@@ -470,7 +483,7 @@ function ChatApp() {
         window.dispatchEvent(new Event("chat-message-sent"));
 
         // 深度研究结果自动保存到知识库
-        if (activeTool === "deep-research" && fullContent && fullContent.length > 50) {
+        if (currentTool === "deep-research" && fullContent && fullContent.length > 50) {
           try {
             const currentUserId = useChatStore.getState().userId;
             // 从用户消息中提取标题
@@ -516,7 +529,6 @@ function ChatApp() {
       updateMessage,
       setMessageStreaming,
       updateConversationTitle,
-      activeTool,
       setIsGenerating,
       scrollToBottom,
       activeGemId,
@@ -710,7 +722,7 @@ function ChatApp() {
         </header>
 
         {/* Chat area */}
-        <div className="flex-1 overflow-y-auto">
+        <div ref={chatContainerRef} className="flex-1 overflow-y-auto min-h-0">
           {!activeConv || activeConv.messages.length === 0 ? (
             /* Empty state - 紧凑布局，一屏显示 */
             <div className="flex flex-col items-center justify-center h-full px-4 py-2">
@@ -806,14 +818,18 @@ function ChatApp() {
                       <p className="text-sm font-medium text-blue-700 dark:text-blue-300">📢 广告位</p>
                       <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">此处可展示推广内容，后台可配置</p>
                     </div>
-                    {isPaidUser && (
-                      <button
-                        onClick={() => handleDismissAd(true)}
-                        className="mt-2 mx-auto block text-[10px] text-blue-500 hover:text-blue-700 underline"
-                      >
-                        永久关闭此广告
-                      </button>
-                    )}
+                    <button
+                      onClick={() => {
+                        if (isPaidUser) {
+                          handleDismissAd(true);
+                        } else {
+                          setShowAdPaywall(true);
+                        }
+                      }}
+                      className="mt-2 mx-auto block text-[10px] text-blue-500 hover:text-blue-700 underline"
+                    >
+                      永久关闭此广告
+                    </button>
                   </div>
                 )}
               </div>
@@ -953,6 +969,72 @@ function ChatApp() {
                 去兑换
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 广告永久关闭付费墙弹窗 */}
+      {showAdPaywall && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowAdPaywall(false)}>
+          <div
+            className="bg-[var(--card)] rounded-2xl p-6 max-w-sm w-full text-center shadow-xl animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-base font-semibold mb-2">🎁 永久关闭广告</p>
+            <p className="text-sm text-[var(--muted)] mb-4">
+              兑换体验卡后即可永久关闭广告位
+            </p>
+            <div className="mb-4 p-3 bg-[var(--sidebar-hover)] rounded-xl">
+              <p className="text-xs text-[var(--muted)] mb-2">请输入兑换码</p>
+              <input
+                type="text"
+                placeholder="OS-XXXX-XXXX"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-sm text-center outline-none focus:border-blue-500"
+                onKeyDown={async (e) => {
+                  if (e.key === "Enter") {
+                    const input = e.currentTarget;
+                    const code = input.value.trim();
+                    if (!/^OS-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(code)) {
+                      alert("兑换码格式错误");
+                      return;
+                    }
+                    try {
+                      const r = await fetch("/api/redeem", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userId, code }),
+                      });
+                      const d = await r.json();
+                      if (r.ok && d.success) {
+                        alert(d.message || "兑换成功！");
+                        setIsPaidUser(true);
+                        handleDismissAd(true);
+                        setShowAdPaywall(false);
+                      } else {
+                        alert(d.error || "兑换失败");
+                      }
+                    } catch {
+                      alert("网络错误，请重试");
+                    }
+                  }
+                }}
+              />
+              <p className="text-[10px] text-[var(--muted)] mt-1">按回车确认兑换</p>
+            </div>
+            <img
+              src={siteConfig?.douyinQrUrl || "/douyin-qr.png"}
+              alt="抖音二维码"
+              className="w-40 h-auto mx-auto rounded-xl mb-3"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+            />
+            <p className="text-sm font-medium mb-1">抖音号：{siteConfig?.douyinAccount || "arch8288"}</p>
+            <p className="text-xs text-[var(--muted)] mb-4">关注获取兑换码 · 小黄车购买体验卡</p>
+            <button
+              onClick={() => setShowAdPaywall(false)}
+              className="w-full px-4 py-2 rounded-xl border border-[var(--border)] text-sm hover:bg-[var(--sidebar-hover)] transition-colors"
+            >
+              稍后再说
+            </button>
           </div>
         </div>
       )}

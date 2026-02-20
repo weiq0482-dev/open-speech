@@ -29,10 +29,18 @@ const TOOLS: { id: ToolMode; label: string; icon: React.ReactNode; desc: string 
   { id: "deep-think", label: "深度推理", icon: <Brain size={16} />, desc: "深度推理，展示思考过程" },
   { id: "deep-research", label: "深度研究", icon: <Search size={16} />, desc: "联网搜索，生成研究报告" },
   { id: "image-gen", label: "生成图片", icon: <Palette size={16} />, desc: "AI 文字生图 / 图片编辑" },
-  { id: "canvas", label: "创意画布", icon: <PenTool size={16} />, desc: "创意写作助手" },
+  { id: "mind-map", label: "生成脑图", icon: <BookOpen size={16} />, desc: "AI 生成思维导图 / 知识图谱" },
+  { id: "canvas", label: "创意写作", icon: <PenTool size={16} />, desc: "创意写作助手" },
   { id: "code-assist", label: "代码助手", icon: <Code size={16} />, desc: "代码生成/调试/重构" },
   { id: "tutor", label: "学习辅导", icon: <GraduationCap size={16} />, desc: "循序渐进的学习辅导" },
   { id: "notebook", label: "文档分析", icon: <FileSearch size={16} />, desc: "上传文档进行分析问答" },
+];
+
+const MIND_MAP_STYLES = [
+  { id: "illustration", label: "🎨 插画风", desc: "可爱卡通手绘，彩色气泡" },
+  { id: "business", label: "💼 商务风", desc: "简洁专业，蓝灰配色" },
+  { id: "colorful", label: "🌈 多彩风", desc: "鲜艳多彩，活泼明亮" },
+  { id: "minimalist", label: "✏️ 极简风", desc: "黑白线条，干净清爽" },
 ];
 
 const SUGGESTIONS = [
@@ -61,6 +69,7 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
   const [showTools, setShowTools] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [imageResolution, setImageResolution] = useState<"standard" | "2k" | "4k">("standard");
+  const [mindMapStyle, setMindMapStyle] = useState("illustration");
   const [editingImage, setEditingImage] = useState<{ id: string; url: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -182,6 +191,17 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
     if (activeTool === "image-gen" && imageResolution !== "standard" && trimmed) {
       const resMap = { "2k": "2048x2048 (2K high resolution)", "4k": "4096x4096 (4K ultra high resolution)" };
       finalContent = `${trimmed}\n\n[Output resolution: ${resMap[imageResolution]}, ensure maximum detail and clarity]`;
+    }
+    // 脑图工具：附加风格指令（不切换工具，page.tsx 会将 mind-map 当图片生成处理）
+    if (activeTool === "mind-map" && trimmed) {
+      const styleMap: Record<string, string> = {
+        illustration: "插画风格，可爱卡通手绘风，彩色圆形气泡节点，配有小图标和emoji表情，背景浅色干净，色彩丰富明亮",
+        business: "商务专业风格，简洁大方，蓝灰配色，方形节点，直线连接，白色背景，干净利落",
+        colorful: "多彩活泼风格，鲜艳渐变色，圆角矩形节点，曲线连接，彩虹配色，欢快明亮",
+        minimalist: "极简黑白风格，细线条连接，简洁文字，留白充足，优雅排版，无背景色",
+      };
+      const styleDesc = styleMap[mindMapStyle] || styleMap.illustration;
+      finalContent = `请生成一张思维导图：${trimmed}，${styleDesc}，所有文字必须使用中文，高清细节`;
     }
     onSend(finalContent, attachments.length > 0 ? attachments : undefined);
     setInput("");
@@ -603,6 +623,27 @@ export function ChatInput({ onSend, disabled, onStop }: ChatInputProps) {
                     )}
                   >
                     {res === "standard" ? "标准" : res.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* 脑图风格选择器 */}
+            {activeTool === "mind-map" && (
+              <div className="flex items-center gap-0.5 ml-1">
+                {MIND_MAP_STYLES.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setMindMapStyle(s.id)}
+                    className={cn(
+                      "px-2 py-1 rounded-md text-[10px] font-medium transition-colors whitespace-nowrap",
+                      mindMapStyle === s.id
+                        ? "bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300"
+                        : "text-[var(--muted)] hover:bg-[var(--sidebar-hover)]"
+                    )}
+                    title={s.desc}
+                  >
+                    {s.label}
                   </button>
                 ))}
               </div>

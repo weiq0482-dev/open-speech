@@ -7,7 +7,7 @@ import { useNotebookStore } from "@/store/notebook-store";
 import { NotebookSources } from "@/components/notebook/notebook-sources";
 import { NotebookChat } from "@/components/notebook/notebook-chat";
 import { NotebookStudio } from "@/components/notebook/notebook-studio";
-import { ArrowLeft, Settings, Share2, Link, X, Users, Copy, Check } from "lucide-react";
+import { ArrowLeft, Settings, Share2, Link, X, Users, Copy, Check, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function NotebookPage() {
@@ -20,6 +20,8 @@ export default function NotebookPage() {
   const [titleValue, setTitleValue] = useState("");
   const [showSharePanel, setShowSharePanel] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [leftOpen, setLeftOpen] = useState(true);
+  const [rightOpen, setRightOpen] = useState(true);
 
   useEffect(() => {
     if (userId && notebookId) {
@@ -189,9 +191,36 @@ export default function NotebookPage() {
       {/* 三栏主体 */}
       {currentNotebook ? (
         <div className="flex-1 flex overflow-hidden">
-          {/* 左栏：来源 */}
-          <div className="w-[280px] shrink-0 border-r border-[var(--border)] flex flex-col bg-[var(--card)]">
-            <NotebookSources notebookId={notebookId} userId={userId} />
+          {/* 左栏：来源（可折叠） */}
+          <div
+            className={cn(
+              "shrink-0 border-r border-[var(--border)] flex flex-col bg-[var(--card)] transition-all duration-200 overflow-hidden",
+              leftOpen ? "w-[280px]" : "w-8"
+            )}
+          >
+            {leftOpen ? (
+              <>
+                <div className="flex items-center justify-between px-3 pt-2 pb-0 shrink-0">
+                  <span />
+                  <button
+                    onClick={() => setLeftOpen(false)}
+                    className="p-1 rounded hover:bg-[var(--sidebar-hover)] text-[var(--muted)] transition-colors"
+                    title="折叠来源栏"
+                  >
+                    <PanelLeftClose size={14} />
+                  </button>
+                </div>
+                <NotebookSources notebookId={notebookId} userId={userId} />
+              </>
+            ) : (
+              <button
+                onClick={() => setLeftOpen(true)}
+                className="flex-1 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--sidebar-hover)] transition-colors"
+                title="展开来源栏"
+              >
+                <PanelLeftOpen size={14} />
+              </button>
+            )}
           </div>
 
           {/* 中栏：AI 对话 / 讨论 */}
@@ -199,9 +228,36 @@ export default function NotebookPage() {
             <NotebookChat notebookId={notebookId} userId={userId} />
           </div>
 
-          {/* 右栏：Studio */}
-          <div className="w-[280px] shrink-0 border-l border-[var(--border)] flex flex-col bg-[var(--card)]">
-            <NotebookStudio notebookId={notebookId} userId={userId} />
+          {/* 右栏：Studio（可折叠） */}
+          <div
+            className={cn(
+              "shrink-0 border-l border-[var(--border)] flex flex-col bg-[var(--card)] transition-all duration-200 overflow-hidden",
+              rightOpen ? "w-[280px]" : "w-8"
+            )}
+          >
+            {rightOpen ? (
+              <>
+                <div className="flex items-center justify-between px-3 pt-2 pb-0 shrink-0">
+                  <span />
+                  <button
+                    onClick={() => setRightOpen(false)}
+                    className="p-1 rounded hover:bg-[var(--sidebar-hover)] text-[var(--muted)] transition-colors"
+                    title="折叠 Studio 栏"
+                  >
+                    <PanelRightClose size={14} />
+                  </button>
+                </div>
+                <NotebookStudio notebookId={notebookId} userId={userId} />
+              </>
+            ) : (
+              <button
+                onClick={() => setRightOpen(true)}
+                className="flex-1 flex items-center justify-center text-[var(--muted)] hover:text-[var(--fg)] hover:bg-[var(--sidebar-hover)] transition-colors"
+                title="展开 Studio 栏"
+              >
+                <PanelRightOpen size={14} />
+              </button>
+            )}
           </div>
         </div>
       ) : (

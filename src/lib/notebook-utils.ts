@@ -77,8 +77,8 @@ export async function getModelConfig(): Promise<{
   qwenApiKey: string;
 }> {
   const redis = getRedis();
-  const settings = await redis.get<{ modelProvider?: string; qwenApiKey?: string }>("system:settings") || {};
-  const provider = (settings.modelProvider === "qwen" ? "qwen" : "gemini") as "gemini" | "qwen";
+  const settings = await redis.get<{ modelProvider?: string; qwenApiKey?: string }>("system_settings") || {};
+  const provider = (settings.modelProvider === "gemini" ? "gemini" : "qwen") as "gemini" | "qwen";
   return {
     provider,
     apiBase: process.env.AI_API_BASE || process.env.GEMINI_API_BASE || "https://4sapi.com",
@@ -174,7 +174,7 @@ async function callQwenNonStream(apiKey: string, opts: AICallOptions): Promise<s
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "qwen3.5-plus",
+      model: "qwen-plus",
       messages,
       stream: false,
       temperature: opts.temperature ?? 0.7,
@@ -209,7 +209,7 @@ async function callQwenStream(apiKey: string, opts: AICallOptions): Promise<Resp
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: "qwen3.5-plus",
+      model: "qwen-plus",
       messages,
       stream: true,
       temperature: opts.temperature ?? 0.7,

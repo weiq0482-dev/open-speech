@@ -162,6 +162,11 @@ export async function verifyCode(
     }
   }
 
+  // 绑定设备指纹到邮箱账户（设备快捷登录需要）
+  if (currentDeviceUserId) {
+    await bindDeviceToEmail(currentDeviceUserId, emailUserId, normalizedEmail);
+  }
+
   // 生成 JWT token
   const token = await generateToken(emailUserId, normalizedEmail);
 
@@ -187,6 +192,24 @@ async function migrateQuota(fromUserId: string, toUserId: string): Promise<void>
   const fromQuota = await redis.get(fromKey);
   if (fromQuota) {
     await redis.set(toKey, fromQuota);
+  }
+}
+
+// ========== 绑定设备到邮箱账户 ==========
+async function bindDeviceToEmail(deviceUserId: string, emailUserId: string, email: string): Promise<void> {
+  const redis = getRedis();
+  
+  // 查找设备记录并更新
+  // 设备 userId 格式: u_<fingerprint前12位>_<时间戳>
+  // 我们需要从设备记录中提取指纹
+  const devicePrefix = "device:";
+  
+  // 尝试通过 account:userId 存储邮箱绑定信息
+  await redis.set(`account:${emailUserId}`, { email, boundAt: new Date().toISOString() });
+  
+  // 如果有设备 userId，也标记它
+  if (deviceUserId.startsWith("u_")) {
+    await redis.set(`account:${deviceUserId}`, { email, boundAt: new Date().toISOString() });
   }
 }
 

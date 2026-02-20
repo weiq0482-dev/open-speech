@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
+  Video,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -57,6 +58,7 @@ const SOURCE_ICONS: Record<string, typeof FileText> = {
   file: FileText,
   url: Globe,
   text: Type,
+  video: Video,
   knowledge: FileText,
 };
 
@@ -69,7 +71,7 @@ export function NotebookSources({
 }) {
   const { sources, loadingSources, addSource, deleteSource, toggleSource } = useNotebookStore();
   const [showAdd, setShowAdd] = useState(false);
-  const [addType, setAddType] = useState<"file" | "url" | "text">("file");
+  const [addType, setAddType] = useState<"file" | "url" | "text" | "video">("file");
   const [urlInput, setUrlInput] = useState("");
   const [textTitle, setTextTitle] = useState("");
   const [textContent, setTextContent] = useState("");
@@ -77,6 +79,8 @@ export function NotebookSources({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [transcriptPrompt, setTranscriptPrompt] = useState<{ title: string; content: string; url: string; platform: string; author: string } | null>(null);
+  const [manualTranscript, setManualTranscript] = useState("");
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -135,6 +139,75 @@ export function NotebookSources({
     setUploading(false);
   };
 
+  const handleVideoAdd = async () => {
+    const url = urlInput.trim();
+    if (!url) return;
+    setUploading(true);
+    try {
+      const resp = await fetch("/api/notebook/fetch-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        // 仅 YouTube 字幕失败时弹出手动粘贴框（其他平台有音频转录兜底，直接保存）
+        if (!data.hasTranscript && data.platform === "YouTube") {
+          setTranscriptPrompt({
+            title: data.title || "视频",
+            content: data.content || "",
+            url,
+            platform: data.platform || "",
+            author: data.author || "",
+          });
+          setManualTranscript("");
+          setUploading(false);
+          return;
+        }
+        await addSource(userId, notebookId, {
+          type: "video",
+          title: data.title || "视频",
+          content: data.content || "",
+          metadata: { url, platform: data.platform, author: data.author, wordCount: (data.content || "").length },
+        });
+        setUrlInput("");
+        setShowAdd(false);
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        alert(err.error || "解析视频失败");
+      }
+    } catch {
+      alert("网络错误");
+    }
+    setUploading(false);
+  };
+
+  // 手动粘贴字幕后保存视频来源
+  const handleSaveWithTranscript = async () => {
+    if (!transcriptPrompt) return;
+    setUploading(true);
+    let finalContent = transcriptPrompt.content;
+    if (manualTranscript.trim()) {
+      finalContent += "\n\n===== 视频字幕/转录文本 =====\n" + manualTranscript.trim() + "\n===== 字幕结束 =====";
+    }
+    await addSource(userId, notebookId, {
+      type: "video",
+      title: transcriptPrompt.title,
+      content: finalContent,
+      metadata: {
+        url: transcriptPrompt.url,
+        platform: transcriptPrompt.platform,
+        author: transcriptPrompt.author,
+        wordCount: finalContent.length,
+      },
+    });
+    setTranscriptPrompt(null);
+    setManualTranscript("");
+    setUrlInput("");
+    setShowAdd(false);
+    setUploading(false);
+  };
+
   const handleTextAdd = async () => {
     if (!textTitle.trim() || !textContent.trim()) return;
     setUploading(true);
@@ -162,6 +235,65 @@ export function NotebookSources({
 
   return (
     <div className="flex flex-col h-full">
+      {/* 手动粘贴字幕弹窗 */}
+      {transcriptPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setTranscriptPrompt(null)}>
+          <div className="bg-[var(--card)] rounded-2xl shadow-2xl w-full max-w-lg p-5 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-base font-semibold">视频字幕提取失败</h3>
+            <p className="text-sm text-[var(--muted)]">
+              「{transcriptPrompt.title}」未能自动获取字幕。
+              你可以手动粘贴字幕文本，也可以跳过直接保存。
+            </p>
+            <div className="text-xs text-[var(--muted)] bg-[var(--sidebar-hover)] rounded-lg p-3 space-y-1">
+              <p className="font-medium text-[var(--foreground)]">如何获取字幕：</p>
+              {transcriptPrompt.platform === "YouTube" && (
+                <>
+                  <p>1. 在 YouTube 视频下方点击「...更多」→「显示转录稿」</p>
+                  <p>2. 复制全部文字，粘贴到下方</p>
+                </>
+              )}
+              {transcriptPrompt.platform === "B站" && (
+                <>
+                  <p>1. 在 B站 视频页面打开「CC字幕」（如果有的话）</p>
+                  <p>2. 或使用浏览器插件提取字幕文本</p>
+                </>
+              )}
+              {transcriptPrompt.platform !== "YouTube" && transcriptPrompt.platform !== "B站" && (
+                <p>请从视频平台复制字幕或转录文本</p>
+              )}
+            </div>
+            <textarea
+              value={manualTranscript}
+              onChange={(e) => setManualTranscript(e.target.value)}
+              placeholder="在此粘贴视频字幕或转录文本..."
+              className="w-full h-32 px-3 py-2 rounded-lg border border-[var(--border)] bg-[var(--background)] text-sm resize-none outline-none focus:border-blue-400"
+            />
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setTranscriptPrompt(null)}
+                className="px-4 py-2 rounded-lg text-sm text-[var(--muted)] hover:bg-[var(--sidebar-hover)]"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleSaveWithTranscript}
+                disabled={uploading}
+                className="px-4 py-2 rounded-lg text-sm bg-gray-200 dark:bg-gray-700 text-[var(--foreground)] hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                跳过字幕，直接保存
+              </button>
+              <button
+                onClick={handleSaveWithTranscript}
+                disabled={uploading || !manualTranscript.trim()}
+                className="px-4 py-2 rounded-lg text-sm bg-blue-500 text-white hover:bg-blue-600 disabled:opacity-50"
+              >
+                {uploading ? "保存中..." : "保存"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-3 py-3 border-b border-[var(--border)] shrink-0">
         <div className="flex items-center justify-between mb-2">
@@ -187,8 +319,9 @@ export function NotebookSources({
           {/* 类型选择 */}
           <div className="flex gap-1 mb-3">
             {[
-              { type: "file" as const, icon: Upload, label: "上传文件" },
+              { type: "file" as const, icon: Upload, label: "文件" },
               { type: "url" as const, icon: Link, label: "网页" },
+              { type: "video" as const, icon: Video, label: "视频" },
               { type: "text" as const, icon: Type, label: "文字" },
             ].map(({ type, icon: Icon, label }) => (
               <button
@@ -245,6 +378,30 @@ export function NotebookSources({
                 className="w-full py-1.5 rounded-lg bg-blue-500 text-white text-xs hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
               >
                 {uploading ? "获取中..." : "添加网页"}
+              </button>
+            </div>
+          )}
+
+          {/* 视频输入 */}
+          {addType === "video" && (
+            <div className="space-y-2">
+              <input
+                type="url"
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                placeholder="粘贴视频链接（抖音/小红书/B站/YouTube）"
+                className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-400"
+                onKeyDown={(e) => e.key === "Enter" && handleVideoAdd()}
+              />
+              <p className="text-[10px] text-[var(--muted)]">
+                支持: 抖音、小红书、B站、YouTube
+              </p>
+              <button
+                onClick={handleVideoAdd}
+                disabled={uploading || !urlInput.trim()}
+                className="w-full py-1.5 rounded-lg bg-blue-500 text-white text-xs hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
+              >
+                {uploading ? "解析中..." : "添加视频"}
               </button>
             </div>
           )}

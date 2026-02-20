@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { MessageSquare, Users, Gift, Settings, Activity, Trash2, LogOut, Shield, UserPlus } from "lucide-react";
 
 // ========== 类型定义 ==========
 interface Message {
@@ -51,7 +52,7 @@ interface AdminSession {
   adminKey: string; // 用于 API 鉴权
 }
 
-type TabKey = "messages" | "users" | "coupons" | "settings" | "admins";
+type TabKey = "messages" | "users" | "coupons" | "settings" | "trash" | "admins" | "monitor";
 
 // ========== 工具函数 ==========
 function adminFetch(url: string, session: AdminSession, options?: RequestInit) {
@@ -247,39 +248,45 @@ export default function AdminPage() {
     );
   }
 
-  const allTabs: { key: TabKey; label: string; perm: string }[] = [
-    { key: "messages", label: "客服消息", perm: "messages" },
-    { key: "users", label: "用户管理", perm: "users" },
-    { key: "coupons", label: "兑换码", perm: "coupons" },
-    { key: "settings", label: "系统设置", perm: "settings" },
-    { key: "admins", label: "管理员", perm: "admins" },
+  const allTabs: { key: TabKey; label: string; perm: string; icon: React.ReactNode }[] = [
+    { key: "messages", label: "客服消息", perm: "messages", icon: <MessageSquare size={16} /> },
+    { key: "users", label: "用户管理", perm: "users", icon: <Users size={16} /> },
+    { key: "coupons", label: "兑换码", perm: "coupons", icon: <Gift size={16} /> },
+    { key: "settings", label: "系统设置", perm: "settings", icon: <Settings size={16} /> },
+    { key: "trash", label: "回收站", perm: "trash", icon: <Trash2 size={16} /> },
+    { key: "admins", label: "管理员", perm: "admins", icon: <Shield size={16} /> },
+    { key: "monitor", label: "访问监控", perm: "monitor", icon: <Activity size={16} /> },
   ];
   const tabs = allTabs.filter((t) => session.permissions.includes(t.perm));
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+      <header className="bg-blue-500 px-6 py-2 flex items-center justify-between">
         <div className="flex items-center gap-6">
-          <h1 className="text-lg font-bold">OpenSpeech 管理后台</h1>
+          <h1 className="text-lg font-bold text-white">OpenSpeech 管理后台</h1>
           <nav className="flex gap-1">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  activeTab === tab.key ? "bg-blue-50 text-blue-600" : "text-gray-600 hover:bg-gray-100"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-sm font-medium transition-colors ${
+                  activeTab === tab.key
+                    ? "bg-white text-blue-600"
+                    : "text-white/90 hover:bg-blue-400"
                 }`}
               >
+                {tab.icon}
                 {tab.label}
               </button>
             ))}
           </nav>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-gray-400">
+          <span className="text-xs text-white/80">
             {session.username} ({session.role === "super" ? "超级管理员" : "管理员"})
           </span>
-          <button onClick={handleLogout} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+          <button onClick={handleLogout} className="flex items-center gap-1 text-xs text-white/80 hover:text-white transition-colors">
+            <LogOut size={14} />
             退出
           </button>
         </div>
@@ -290,7 +297,9 @@ export default function AdminPage() {
         {activeTab === "users" && <UsersTab session={session} />}
         {activeTab === "coupons" && <CouponsTab session={session} />}
         {activeTab === "settings" && <SettingsTab session={session} />}
-        {activeTab === "admins" && session.role === "super" && <AdminsTab session={session} />}
+        {activeTab === "trash" && <TrashTab session={session} />}
+        {activeTab === "admins" && <AdminsTab session={session} />}
+        {activeTab === "monitor" && <MonitorTab session={session} />}
       </div>
     </div>
   );
@@ -439,6 +448,7 @@ function UsersTab({ session }: { session: AdminSession }) {
   const [filter, setFilter] = useState<"all" | "free" | "paid" | "locked" | "suspicious">("all");
   const [lockReason, setLockReason] = useState("");
   const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -480,6 +490,13 @@ function UsersTab({ session }: { session: AdminSession }) {
   };
 
   const filteredUsers = users.filter((u) => {
+    // 搜索过滤
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchSearch = u.userId.toLowerCase().includes(q) || (u.email?.toLowerCase().includes(q));
+      if (!matchSearch) return false;
+    }
+    // 状态过滤
     if (filter === "free") return u.plan === "free";
     if (filter === "paid") return u.plan !== "free";
     if (filter === "locked") return !!u.locked;
@@ -512,28 +529,24 @@ function UsersTab({ session }: { session: AdminSession }) {
         </div>
       </div>
 
-      {/* 筛选 */}
-      <div className="flex gap-2">
-        {(["all", "free", "paid", "locked", "suspicious"] as const).map((f) => {
-          const labels: Record<string, string> = { all: "全部", free: "免费用户", paid: "付费用户", locked: "已锁定", suspicious: "可疑" };
-          return (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                filter === f ? "bg-blue-500 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
-              }`}
-            >
-              {labels[f]} ({f === "all" ? total : f === "suspicious" ? suspicious.length : users.filter((u) => {
-                if (f === "free") return u.plan === "free";
-                if (f === "paid") return u.plan !== "free";
-                if (f === "locked") return !!u.locked;
-                return false;
-              }).length})
-            </button>
-          );
-        })}
-        <button onClick={fetchUsers} className="ml-auto px-3 py-1.5 rounded-lg text-xs bg-white border border-gray-200 hover:bg-gray-50">
+      {/* 搜索框和刷新按钮 */}
+      <div className="flex items-center gap-3">
+        <div className="relative flex-1 max-w-xs">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="按用户ID/邮箱/手机号..."
+            className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500"
+          />
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
+        <button onClick={fetchUsers} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm bg-white border border-gray-200 hover:bg-gray-50">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
           刷新
         </button>
       </div>
@@ -542,12 +555,11 @@ function UsersTab({ session }: { session: AdminSession }) {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 text-gray-500 text-xs">
+            <tr className="border-b border-gray-100 text-blue-600 text-xs">
               <th className="text-left px-4 py-3 font-medium">用户</th>
               <th className="text-left px-4 py-3 font-medium">套餐</th>
-              <th className="text-left px-4 py-3 font-medium">对话/生图</th>
+              <th className="text-left px-4 py-3 font-medium">套餐额度</th>
               <th className="text-left px-4 py-3 font-medium">今日用量</th>
-              <th className="text-left px-4 py-3 font-medium">兑换码</th>
               <th className="text-left px-4 py-3 font-medium">注册时间</th>
               <th className="text-left px-4 py-3 font-medium">状态</th>
               <th className="text-left px-4 py-3 font-medium">操作</th>
@@ -558,30 +570,20 @@ function UsersTab({ session }: { session: AdminSession }) {
               <tr key={user.userId} className="border-t border-gray-100 hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <div className="flex flex-col gap-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-xs">{shortId(user.userId)}</span>
-                      {user.userId.startsWith("em_") && (
-                        <span className="text-[9px] bg-green-100 text-green-700 px-1 rounded">邮箱</span>
-                      )}
-                    </div>
+                    <span className="font-medium text-sm">{shortId(user.userId)}</span>
                     {user.email && (
-                      <span className="text-[10px] text-gray-400">{user.email}</span>
+                      <span className="text-[11px] text-gray-400">{user.email}</span>
                     )}
                   </div>
                 </td>
                 <td className="px-4 py-3">{planBadge(user.plan, userPlans)}</td>
-                <td className="px-4 py-3 text-xs">
-                  {user.plan === "free" ? "-" : `${user.chatRemaining} / ${user.imageRemaining}`}
+                <td className="px-4 py-3 text-xs text-amber-600 font-medium">
+                  {user.plan === "free" ? "-" : user.chatRemaining}
                 </td>
                 <td className="px-4 py-3 text-xs">
-                  <span className={user.dailyFreeUsed >= 4 ? "text-red-500 font-semibold" : ""}>
+                  <span className={user.dailyFreeUsed >= 4 ? "text-red-500 font-semibold" : "text-gray-600"}>
                     {user.dailyFreeUsed}
                   </span>
-                </td>
-                <td className="px-4 py-3 text-xs text-gray-500">
-                  {user.redeemCode ? (
-                    <span className="font-mono text-[10px] bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{user.redeemCode}</span>
-                  ) : "-"}
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500">
                   {user.createdAt ? new Date(user.createdAt).toLocaleDateString("zh-CN") :
@@ -589,41 +591,24 @@ function UsersTab({ session }: { session: AdminSession }) {
                 </td>
                 <td className="px-4 py-3">
                   {user.locked ? (
-                    <span className="text-[10px] bg-red-100 text-red-700 px-2 py-0.5 rounded font-medium">
-                      已锁定
-                    </span>
-                  ) : suspicious.some((s) => s.userId === user.userId) ? (
-                    <span className="text-[10px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded font-medium">
-                      可疑
+                    <span className="text-[11px] bg-red-100 text-red-600 px-2 py-0.5 rounded font-medium">
+                      已锁
                     </span>
                   ) : (
-                    <span className="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded font-medium">
+                    <span className="text-[11px] bg-green-100 text-green-600 px-2 py-0.5 rounded font-medium">
                       正常
                     </span>
                   )}
                 </td>
                 <td className="px-4 py-3">
                   {user.locked ? (
-                    <button onClick={() => handleUnlock(user.userId)} className="text-xs text-blue-500 hover:underline">
+                    <button onClick={() => handleUnlock(user.userId)} className="text-xs text-blue-500 hover:underline flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" /></svg>
                       解锁
                     </button>
-                  ) : actionUserId === user.userId ? (
-                    <div className="flex items-center gap-1">
-                      <input
-                        value={lockReason}
-                        onChange={(e) => setLockReason(e.target.value)}
-                        placeholder="原因"
-                        className="px-2 py-1 border border-gray-200 rounded text-xs w-24"
-                      />
-                      <button onClick={() => handleLock(user.userId)} className="text-xs text-red-500 hover:underline">
-                        确认
-                      </button>
-                      <button onClick={() => setActionUserId(null)} className="text-xs text-gray-400 hover:underline">
-                        取消
-                      </button>
-                    </div>
                   ) : (
-                    <button onClick={() => setActionUserId(user.userId)} className="text-xs text-red-500 hover:underline">
+                    <button onClick={() => setActionUserId(user.userId)} className="text-xs text-red-500 hover:underline flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                       锁定
                     </button>
                   )}
@@ -857,8 +842,9 @@ function CouponsTab({ session }: { session: AdminSession }) {
 function SettingsTab({ session }: { session: AdminSession }) {
   const [freeTrialDays, setFreeTrialDays] = useState(30);
   const [freeDailyLimit, setFreeDailyLimit] = useState(5);
-  const [modelProvider, setModelProvider] = useState<"gemini" | "qwen">("gemini");
+  const [modelProvider, setModelProvider] = useState<"gemini" | "qwen">("qwen");
   const [qwenApiKey, setQwenApiKey] = useState("");
+  const [geminiApiKey, setGeminiApiKey] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -876,8 +862,9 @@ function SettingsTab({ session }: { session: AdminSession }) {
       if (d.settings) {
         setFreeTrialDays(d.settings.freeTrialDays || 30);
         setFreeDailyLimit(d.settings.freeDailyLimit || 5);
-        setModelProvider(d.settings.modelProvider || "gemini");
+        setModelProvider(d.settings.modelProvider || "qwen");
         setQwenApiKey(d.settings.qwenApiKey || "");
+        setGeminiApiKey(d.settings.geminiApiKey || "");
       }
     }).catch(() => {});
     adminFetch("/api/admin/plans", session).then((r) => r.json()).then((d) => {
@@ -890,7 +877,7 @@ function SettingsTab({ session }: { session: AdminSession }) {
     try {
       await adminFetch("/api/admin/settings", session, {
         method: "POST",
-        body: JSON.stringify({ freeTrialDays, freeDailyLimit, modelProvider, qwenApiKey }),
+        body: JSON.stringify({ freeTrialDays, freeDailyLimit, modelProvider, qwenApiKey, geminiApiKey }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -1109,6 +1096,22 @@ function SettingsTab({ session }: { session: AdminSession }) {
           </div>
         </div>
 
+        {modelProvider === "gemini" && (
+          <div className="animate-fade-in">
+            <label className="text-xs text-gray-500 mb-1 block">Google Gemini API Key</label>
+            <input
+              type="password"
+              value={geminiApiKey}
+              onChange={(e) => setGeminiApiKey(e.target.value)}
+              placeholder="AIzaSy..."
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500 font-mono"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              在 <a href="https://aistudio.google.com/app/apikey" target="_blank" className="text-blue-500 hover:underline">Google AI Studio</a> 获取 API Key
+            </p>
+          </div>
+        )}
+
         {modelProvider === "qwen" && (
           <div className="animate-fade-in">
             <label className="text-xs text-gray-500 mb-1 block">通义千问 API Key</label>
@@ -1186,6 +1189,9 @@ function AdminsTab({ session }: { session: AdminSession }) {
     { key: "users", label: "用户管理" },
     { key: "coupons", label: "兑换码" },
     { key: "settings", label: "系统设置" },
+    { key: "trash", label: "回收站" },
+    { key: "admins", label: "管理员" },
+    { key: "monitor", label: "访问监控" },
   ];
 
   const fetchAdmins = useCallback(async () => {
@@ -1245,19 +1251,21 @@ function AdminsTab({ session }: { session: AdminSession }) {
   if (loading) return <div className="text-center text-gray-400 py-20">加载中...</div>;
 
   return (
-    <div className="max-w-2xl space-y-4">
+    <div className="space-y-4">
       {msg && (
         <div className={`p-3 rounded-lg text-sm ${msg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
           {msg.text}
         </div>
       )}
 
-      <div className="flex items-center justify-between">
+      {/* 标题栏 */}
+      <div className="bg-blue-500 text-white px-4 py-3 rounded-t-xl flex items-center justify-between">
         <h3 className="text-sm font-semibold">管理员列表</h3>
         <button
           onClick={() => setShowCreate(!showCreate)}
-          className="px-3 py-1.5 rounded-lg text-xs bg-blue-500 text-white hover:bg-blue-600"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-white text-blue-600 hover:bg-blue-50 font-medium"
         >
+          <UserPlus size={14} />
           {showCreate ? "取消" : "新建管理员"}
         </button>
       </div>
@@ -1297,20 +1305,19 @@ function AdminsTab({ session }: { session: AdminSession }) {
           </div>
           <button
             onClick={handleCreate}
-            className="px-4 py-2 rounded-lg bg-green-500 text-white text-sm hover:bg-green-600"
+            className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm hover:bg-blue-600"
           >
             创建
           </button>
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-b-xl border border-gray-200 border-t-0 overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 text-gray-500 text-xs">
+            <tr className="border-b border-gray-100 text-blue-600 text-xs">
               <th className="text-left px-4 py-3 font-medium">用户名</th>
               <th className="text-left px-4 py-3 font-medium">权限</th>
-              <th className="text-left px-4 py-3 font-medium">创建者</th>
               <th className="text-left px-4 py-3 font-medium">创建时间</th>
               <th className="text-left px-4 py-3 font-medium">最后登录</th>
               <th className="text-left px-4 py-3 font-medium">操作</th>
@@ -1329,7 +1336,6 @@ function AdminsTab({ session }: { session: AdminSession }) {
                     ))}
                   </div>
                 </td>
-                <td className="px-4 py-3 text-xs text-gray-500">{a.createdBy}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{new Date(a.createdAt).toLocaleDateString("zh-CN")}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{a.lastLogin ? new Date(a.lastLogin).toLocaleString("zh-CN") : "-"}</td>
                 <td className="px-4 py-3">
@@ -1346,6 +1352,168 @@ function AdminsTab({ session }: { session: AdminSession }) {
         </table>
         {admins.length === 0 && (
           <p className="text-center text-gray-400 text-sm py-8">暂无普通管理员</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ========== 访问监控 Tab ==========
+function MonitorTab({ session }: { session: AdminSession }) {
+  const [stats, setStats] = useState<{ totalVisits: number; todayVisits: number; activeUsers: number }>({ totalVisits: 0, todayVisits: 0, activeUsers: 0 });
+  const [recentLogs, setRecentLogs] = useState<{ userId: string; action: string; ip: string; time: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const resp = await adminFetch("/api/admin/monitor", session);
+      if (resp.ok) {
+        const data = await resp.json();
+        setStats(data.stats || { totalVisits: 0, todayVisits: 0, activeUsers: 0 });
+        setRecentLogs(data.logs || []);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  if (loading) return <div className="text-center text-gray-400 py-20">加载中...</div>;
+
+  return (
+    <div className="space-y-4">
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <p className="text-2xl font-bold text-gray-900">{stats.totalVisits}</p>
+          <p className="text-xs text-gray-500 mt-1">总访问量</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <p className="text-2xl font-bold text-blue-600">{stats.todayVisits}</p>
+          <p className="text-xs text-gray-500 mt-1">今日访问</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-gray-200">
+          <p className="text-2xl font-bold text-green-600">{stats.activeUsers}</p>
+          <p className="text-xs text-gray-500 mt-1">活跃用户</p>
+        </div>
+      </div>
+
+      {/* 操作按钮 */}
+      <div className="flex justify-end">
+        <button onClick={fetchData} className="px-3 py-1.5 rounded-lg text-xs bg-white border border-gray-200 hover:bg-gray-50">
+          刷新
+        </button>
+      </div>
+
+      {/* 访问日志 */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-gray-500 text-xs">
+              <th className="text-left px-4 py-3 font-medium">用户</th>
+              <th className="text-left px-4 py-3 font-medium">操作</th>
+              <th className="text-left px-4 py-3 font-medium">IP</th>
+              <th className="text-left px-4 py-3 font-medium">时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentLogs.map((log, i) => (
+              <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-4 py-3 font-mono text-xs">{log.userId.slice(0, 8)}...</td>
+                <td className="px-4 py-3 text-xs">{log.action}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{log.ip}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{new Date(log.time).toLocaleString("zh-CN")}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {recentLogs.length === 0 && (
+          <p className="text-center text-gray-400 text-sm py-8">暂无访问记录</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ========== 回收站 Tab ==========
+function TrashTab({ session }: { session: AdminSession }) {
+  const [items, setItems] = useState<{ id: string; type: string; name: string; deletedAt: string; deletedBy: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const resp = await adminFetch("/api/admin/trash", session);
+      if (resp.ok) {
+        const data = await resp.json();
+        setItems(data.items || []);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [session]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  const handleRestore = async (id: string) => {
+    await adminFetch("/api/admin/trash/restore", session, {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    });
+    fetchData();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("确定要永久删除吗？此操作不可恢复！")) return;
+    await adminFetch("/api/admin/trash/delete", session, {
+      method: "POST",
+      body: JSON.stringify({ id }),
+    });
+    fetchData();
+  };
+
+  if (loading) return <div className="text-center text-gray-400 py-20">加载中...</div>;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end">
+        <button onClick={fetchData} className="px-3 py-1.5 rounded-lg text-xs bg-white border border-gray-200 hover:bg-gray-50">
+          刷新
+        </button>
+      </div>
+
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-gray-500 text-xs">
+              <th className="text-left px-4 py-3 font-medium">类型</th>
+              <th className="text-left px-4 py-3 font-medium">名称</th>
+              <th className="text-left px-4 py-3 font-medium">删除者</th>
+              <th className="text-left px-4 py-3 font-medium">删除时间</th>
+              <th className="text-left px-4 py-3 font-medium">操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((item) => (
+              <tr key={item.id} className="border-t border-gray-100 hover:bg-gray-50">
+                <td className="px-4 py-3">
+                  <span className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{item.type}</span>
+                </td>
+                <td className="px-4 py-3 text-sm">{item.name}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{item.deletedBy}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{new Date(item.deletedAt).toLocaleString("zh-CN")}</td>
+                <td className="px-4 py-3 flex gap-2">
+                  <button onClick={() => handleRestore(item.id)} className="text-xs text-blue-500 hover:underline">
+                    恢复
+                  </button>
+                  <button onClick={() => handleDelete(item.id)} className="text-xs text-red-500 hover:underline">
+                    永久删除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {items.length === 0 && (
+          <p className="text-center text-gray-400 text-sm py-8">回收站为空</p>
         )}
       </div>
     </div>

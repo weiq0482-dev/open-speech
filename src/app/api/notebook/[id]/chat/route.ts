@@ -47,12 +47,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const systemPrompt = sourceTexts
       ? `你是一个知识库分析助手。用户提供了以下参考资料，请基于这些资料回答用户的问题。
 如果问题与资料相关，请引用具体来源回答。如果资料中没有相关信息，请说明并尽你所能回答。
+**重要：无论资料是什么语言，你都必须使用中文回复。** 如果资料是英文或其他语言，请翻译成中文后回答。
 回复使用 Markdown 格式。
 
 ===== 知识库资料 =====
 ${sourceTexts}
 ===== 资料结束 =====`
-      : "你是一个知识库分析助手。当前知识库没有来源资料，请提醒用户先添加资料来源。回复使用 Markdown 格式。";
+      : "你是一个知识库分析助手。当前知识库没有来源资料，请提醒用户先添加资料来源。回复使用中文和 Markdown 格式。";
 
     // 构建对话历史
     const chatHistory = (history || []).slice(-10).map((m: ChatMessage) => ({

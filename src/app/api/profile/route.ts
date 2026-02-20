@@ -153,8 +153,8 @@ async function generateExpertsWithAI(
 ): Promise<ExpertTemplate[]> {
   // 读取后台设置（模型提供商和 Key）
   const redis = getRedis();
-  const settings = await redis.get<{ modelProvider?: string; qwenApiKey?: string }>("system:settings") || {};
-  const modelProvider = settings.modelProvider || "gemini";
+  const settings = await redis.get<{ modelProvider?: string; qwenApiKey?: string }>("system_settings") || {};
+  const modelProvider = settings.modelProvider || "qwen";
 
   // 构建用户画像描述
   const parts: string[] = [];

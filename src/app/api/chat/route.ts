@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { canUse, deductQuota, canUseByIp, deductByIp } from "@/lib/quota-store";
 import { Redis } from "@upstash/redis";
-import { callQwenAPI, transformQwenStream, qwenImageGenNotSupported } from "@/lib/qwen-adapter";
+import { callQwenAPI, transformQwenStream, handleQwenImageGen } from "@/lib/qwen-adapter";
 
 // 验证 userId 是否为已注册设备
 let _deviceRedis: Redis | null = null;
@@ -88,6 +88,11 @@ const SYSTEM_PROMPTS: Record<string, string> = {
 2. 提供循序渐进的学习指导
 3. 使用例子和类比帮助理解
 4. 鼓励学生思考，适时提出练习问题
+数学公式规则（非常重要）：
+- 行内公式用单个美元符号：$E=mc^2$
+- 独立公式块用双美元符号：$$\\sum_{i=1}^{n} x_i$$
+- 乘号用 \\times，除号用 \\div，分数用 \\frac{a}{b}
+- 上标用 ^，下标用 _，如 $2^3$、$a_1$
 请用 Markdown 格式组织回答。`,
   "code-assist": SAFETY_PREFIX + `你是一个专业的编程助手。你擅长：
 1. 代码生成、调试、重构、优化
@@ -151,6 +156,15 @@ async function handleImageGen(messages: any[], apiBase: string, apiKey: string) 
   const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
   const rawPrompt = lastUserMsg?.content || "A beautiful landscape";
 
+  // 增强提示词：脑图/思维导图自动添加插画风格 + 默认中文
+  const isMindMap = /脑图|思维导图|mind\s*map|知识图谱|概念图/i.test(rawPrompt);
+  let enhancedPrompt = rawPrompt;
+  if (isMindMap) {
+    enhancedPrompt = `${rawPrompt}，插画风格，可爱卡通手绘风，彩色圆形气泡节点，配有小图标和emoji表情，所有文字必须使用中文，背景浅色干净，色彩丰富明亮，高清细节`;
+  } else if (!/英文|english/i.test(rawPrompt)) {
+    enhancedPrompt = `${rawPrompt}，图中所有文字使用中文`;
+  }
+
   const apiUrl = `${apiBase}/v1beta/models/${IMAGE_MODEL}:generateContent`;
 
   // 检查是否有图片附件（图片编辑模式）
@@ -160,7 +174,7 @@ async function handleImageGen(messages: any[], apiBase: string, apiKey: string) 
 
   // 构建 parts：文本 + 可能的图片附件（用于图片编辑）
   const imageGenPrefix = "Please generate an IMAGE (not code, not text) based on this request: ";
-  const parts: any[] = [{ text: hasImageAttachment ? rawPrompt : imageGenPrefix + rawPrompt }];
+  const parts: any[] = [{ text: hasImageAttachment ? enhancedPrompt : imageGenPrefix + enhancedPrompt }];
   if (lastUserMsg?.attachments) {
     for (const att of lastUserMsg.attachments) {
       if (att.mimeType.startsWith("image/")) {
@@ -463,8 +477,8 @@ export async function POST(req: NextRequest) {
   try {
     // 读取后台设置（模型提供商）
     const redis = getDeviceRedis();
-    const settings = await redis.get<{ modelProvider?: string; qwenApiKey?: string }>("system:settings") || {};
-    const modelProvider = settings.modelProvider || "gemini";
+    const settings = await redis.get<{ modelProvider?: string; qwenApiKey?: string }>("system_settings") || {};
+    const modelProvider = settings.modelProvider || "qwen";
     const qwenApiKey = settings.qwenApiKey || "";
 
     const rawBody = await req.text();
@@ -494,7 +508,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const isImageGen = tool === "image-gen";
+    const isImageGen = tool === "image-gen" || tool === "mind-map";
     const usageType = isImageGen ? "image" as const : "chat" as const;
 
     // userId 格式校验：支持设备用户（u_开头）和邮箱用户（em_开头），不匹配时当匿名用户
@@ -620,19 +634,24 @@ export async function POST(req: NextRequest) {
     if (modelProvider === "qwen") {
       // 通义千问模式
       if (isImageGen) {
-        // 通义千问不支持图片生成
-        return new Response(
-          JSON.stringify({ error: qwenImageGenNotSupported() }),
-          { status: 400, headers: { "Content-Type": "application/json" } }
-        );
-      }
+        // 使用 DashScope 文生图 API
+        const finalQwenKey = usingOwnKey ? apiKey : qwenApiKey;
+        if (!finalQwenKey) {
+          return new Response(
+            JSON.stringify({ error: "系统服务升级中，请联系客服" }),
+            { status: 503, headers: { "Content-Type": "application/json" } }
+          );
+        }
+        response = await handleQwenImageGen(finalQwenKey, messages);
+        // 图片生成完成后跳到扣减配额逻辑
+      } else {
       
       // 使用通义千问 API Key（优先后台配置，其次用户自带）
       const finalQwenKey = usingOwnKey ? apiKey : qwenApiKey;
       if (!finalQwenKey) {
         return new Response(
-          JSON.stringify({ error: "通义千问 API Key 未配置，请在后台设置中配置" }),
-          { status: 401, headers: { "Content-Type": "application/json" } }
+          JSON.stringify({ error: "系统服务升级中，请联系客服" }),
+          { status: 503, headers: { "Content-Type": "application/json" } }
         );
       }
 
@@ -665,6 +684,7 @@ export async function POST(req: NextRequest) {
           Connection: "keep-alive",
         },
       });
+      }
     } else {
       // Gemini 模式（默认）
       if (isImageGen) {

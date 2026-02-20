@@ -100,12 +100,12 @@ async function getSystemSettings(): Promise<SystemSettings> {
     return {
       freeTrialDays: settings?.freeTrialDays || FREE_TRIAL_DAYS,
       freeDailyLimit: settings?.freeDailyLimit || FREE_DAILY_LIMIT,
-      modelProvider: (settings as any)?.modelProvider || "gemini",
+      modelProvider: (settings as any)?.modelProvider || "qwen",
       shareRewardChat: (settings as any)?.shareRewardChat || 29,
       shareRewardImage: (settings as any)?.shareRewardImage || 9,
     };
   } catch {
-    return { freeTrialDays: FREE_TRIAL_DAYS, freeDailyLimit: FREE_DAILY_LIMIT, modelProvider: "gemini", shareRewardChat: 29, shareRewardImage: 9 };
+    return { freeTrialDays: FREE_TRIAL_DAYS, freeDailyLimit: FREE_DAILY_LIMIT, modelProvider: "qwen", shareRewardChat: 29, shareRewardImage: 9 };
   }
 }
 

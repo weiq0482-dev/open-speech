@@ -6,6 +6,10 @@ import { Loader2, RefreshCw, ChevronDown, ChevronRight, Mic, Play, Pause, Volume
 import { IconMagicWand } from "@/components/app-icons";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 
 export function NotebookStudio({
   notebookId,
@@ -21,6 +25,8 @@ export function NotebookStudio({
     generateStudio,
     sources,
     podcastData,
+    podcastNarration,
+    podcastDialogue,
     generatingPodcast,
     fetchPodcast,
     generatePodcast,
@@ -139,7 +145,7 @@ export function NotebookStudio({
                     <div className="px-3 pb-3 border-t border-[var(--border)] animate-fade-in">
                       <div className="mt-2 max-h-[400px] overflow-y-auto rounded-lg bg-[var(--card)] p-3">
                         <div className="prose prose-sm dark:prose-invert max-w-none text-xs [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                          <ReactMarkdown>{output.content}</ReactMarkdown>
+                          <ReactMarkdown remarkPlugins={[remarkGfm, remarkMath]} rehypePlugins={[rehypeKatex]}>{output.content}</ReactMarkdown>
                         </div>
                       </div>
                       <div className="flex gap-2 mt-2">
@@ -175,6 +181,8 @@ export function NotebookStudio({
                 notebookId={notebookId}
                 userId={userId}
                 podcastData={podcastData}
+                podcastNarration={podcastNarration}
+                podcastDialogue={podcastDialogue}
                 generatingPodcast={generatingPodcast}
                 generatePodcast={generatePodcast}
                 onClose={() => setShowPodcast(false)}
@@ -207,7 +215,8 @@ export function NotebookStudio({
 function PodcastPanel({
   notebookId,
   userId,
-  podcastData,
+  podcastNarration,
+  podcastDialogue,
   generatingPodcast,
   generatePodcast,
   onClose,
@@ -215,11 +224,15 @@ function PodcastPanel({
   notebookId: string;
   userId: string;
   podcastData: ReturnType<typeof useNotebookStore.getState>["podcastData"];
+  podcastNarration: ReturnType<typeof useNotebookStore.getState>["podcastNarration"];
+  podcastDialogue: ReturnType<typeof useNotebookStore.getState>["podcastDialogue"];
   generatingPodcast: boolean;
   generatePodcast: (userId: string, notebookId: string, mode: string, voices?: Record<string, string>) => Promise<void>;
   onClose: () => void;
 }) {
-  const [mode, setMode] = useState<"narration" | "dialogue">(podcastData?.mode || "narration");
+  const [mode, setMode] = useState<"narration" | "dialogue">("narration");
+  // 当前模式对应的播客数据
+  const podcastData = mode === "narration" ? podcastNarration : podcastDialogue;
   const [playing, setPlaying] = useState(false);
   const [currentSegment, setCurrentSegment] = useState(0);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
@@ -252,13 +265,22 @@ function PodcastPanel({
     const seg = podcastData.segments[index];
     const utterance = new SpeechSynthesisUtterance(seg.text);
     utterance.lang = "zh-CN";
-    utterance.rate = 1.0;
+    utterance.rate = 0.9;  // 稍慢更自然
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
 
-    // 根据角色选择不同音调
-    if (seg.speaker === "Guest") {
-      utterance.pitch = 0.8;
-    } else if (seg.speaker === "Host") {
-      utterance.pitch = 1.2;
+    // 尝试选择更自然的中文声音
+    const voices = window.speechSynthesis.getVoices();
+    const zhVoices = voices.filter((v) => v.lang.startsWith("zh"));
+    if (zhVoices.length > 0) {
+      // 对话模式：Host 用第一个声音，Guest 用第二个（如有）
+      if (seg.speaker === "Guest" && zhVoices.length > 1) {
+        utterance.voice = zhVoices[1];
+        utterance.pitch = 0.95;
+      } else {
+        utterance.voice = zhVoices[0];
+        utterance.pitch = 1.05;
+      }
     }
 
     utterance.onend = () => {

@@ -6,7 +6,7 @@
   <title>OpenSpeech 客服管理后台</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; overflow: hidden; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f0f2f5; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
     /* 左侧会话列表 */
     .sidebar { width: 320px; background: #fff; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column; flex-shrink: 0; }
@@ -69,11 +69,15 @@
     .no-chat p { font-size: 15px; }
     .hidden { display: none !important; }
 
-    /* 标签页 */
-    .tab-bar { display: flex; border-bottom: 1px solid #e5e7eb; }
-    .tab-btn { flex: 1; padding: 10px 0; border: none; background: none; font-size: 13px; font-weight: 500; color: #999; cursor: pointer; transition: all 0.2s; border-bottom: 2px solid transparent; }
-    .tab-btn:hover { color: #333; background: #f9fafb; }
-    .tab-btn.active { color: #3b82f6; border-bottom-color: #3b82f6; }
+    /* 顶部导航栏 - 蓝色背景风格 */
+    .top-header { background: #3b82f6; padding: 0 24px; display: flex; align-items: center; gap: 8px; flex-shrink: 0; height: 48px; }
+    .top-header h1 { font-size: 15px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .top-header h1 img { width: 24px; height: 24px; }
+    .tab-bar { display: flex; gap: 2px; margin-left: 24px; }
+    .tab-btn { padding: 8px 14px; border: none; background: transparent; font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); cursor: pointer; transition: all 0.2s; border-radius: 6px; white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+    .tab-btn:hover { background: rgba(255,255,255,0.15); color: #fff; }
+    .tab-btn.active { background: rgba(255,255,255,0.2); color: #fff; }
+    .main-container { display: flex; flex: 1; overflow: hidden; }
 
     /* 兑换码列表项 */
     .coupon-item { padding: 10px 12px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 8px; background: #fff; font-size: 12px; }
@@ -94,21 +98,23 @@
   </style>
 </head>
 <body>
+  <!-- 顶部导航栏 - 蓝色背景风格 -->
+  <div class="top-header">
+    <h1><img src="/LOGO.png" alt="logo" style="filter: brightness(0) invert(1);">智能审阅 管理后台</h1>
+    <div class="tab-bar">
+      <button class="tab-btn active" onclick="switchTab('chat')">� 客服消息</button>
+      <button class="tab-btn" onclick="switchTab('user')">👤 用户管理</button>
+      <button class="tab-btn" onclick="switchTab('coupon')">🎫 兑换码</button>
+      <button class="tab-btn" onclick="switchTab('settings')">⚙️ 系统设置</button>
+      <button class="tab-btn" onclick="switchTab('monitor')">� 访问监控</button>
+      <button class="tab-btn" onclick="switchTab('trash')">🗑 回收站</button>
+    </div>
+  </div>
+
+  <!-- 主内容区 -->
+  <div class="main-container">
   <!-- 左侧 -->
   <div class="sidebar">
-    <div class="sidebar-header">
-      <h1>🎧 管理后台</h1>
-      <p>OpenSpeech 管理系统</p>
-    </div>
-    <!-- 标签页切换 -->
-    <div class="tab-bar">
-      <button class="tab-btn active" onclick="switchTab('chat')">💬 客服</button>
-      <button class="tab-btn" onclick="switchTab('coupon')">🎫 兑换码</button>
-      <button class="tab-btn" onclick="switchTab('monitor')">👁 监控</button>
-      <button class="tab-btn" onclick="switchTab('user')">👤 用户</button>
-      <button class="tab-btn" onclick="switchTab('trash')">🗑 回收</button>
-      <button class="tab-btn" onclick="switchTab('settings')">⚙️</button>
-    </div>
     <!-- 客服标签内容 -->
     <div id="tabChat">
       <div class="status-bar">
@@ -406,6 +412,7 @@
       </div>
     </div>
   </div>
+  </div><!-- 关闭 main-container -->
 
   <!-- 图片大图查看 -->
   <div class="lightbox hidden" id="lightbox" onclick="this.classList.add('hidden')">
@@ -1049,11 +1056,15 @@
         }
         let html = `<div style="background:#f9fafb;border-radius:8px;padding:10px;font-size:11px;">`;
         html += `<div style="font-weight:600;margin-bottom:4px;">userId: <span style="font-family:monospace;">${data.userId}</span></div>`;
-        if (data.email) html += `<div>邮箱: ${escapeHtml(data.email)}</div>`;
+        if (data.email) html += `<div>📧 邮箱: ${escapeHtml(data.email)}</div>`;
         if (data.profile) {
-          html += `<div>兴趣: ${(data.profile.interests || []).join(', ') || '无'}</div>`;
-          html += `<div>职业: ${data.profile.profession || '未设置'}</div>`;
-          html += `<div>设置完成: ${data.profile.setupCompleted ? '✅' : '❌'}</div>`;
+          const p = data.profile;
+          html += `<div style="margin-top:6px;padding-top:6px;border-top:1px dashed #e0e3e8;font-weight:600;">📋 个人资料</div>`;
+          html += `<div>👤 用户名: ${p.userName || '未设置'}</div>`;
+          html += `<div>🎭 头像: ${p.avatar || '😀'}</div>`;
+          html += `<div>💼 职业: ${p.profession || '未设置'}</div>`;
+          html += `<div>❤️ 兴趣: ${(p.interests || []).join('、') || '未设置'}</div>`;
+          html += `<div>✅ 设置完成: ${p.setupCompleted ? '是' : '否'}</div>`;
         } else {
           html += `<div style="color:#999;">未设置用户资料</div>`;
         }

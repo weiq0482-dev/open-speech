@@ -26,46 +26,17 @@ import {
 import type { ComponentType } from "react";
 
 // ========== 项目 Logo ==========
-// 基于 Borromean rings（三环交织）的数学几何图案
-// 代表智慧、连接、无限可能
-export function AppLogo({ size = 24, className = "", white = false }: { size?: number; className?: string; white?: boolean }) {
-  const r = size * 0.25;
-  const cx = size / 2;
-  const cy = size / 2;
-  const offset = size * 0.14;
-  const sw = size * 0.08;
-  const uid = `logo-${size}-${white ? "w" : "c"}`;
-
-  if (white) {
-    return (
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none" className={className}>
-        <circle cx={cx} cy={cy - offset} r={r} stroke="white" strokeWidth={sw} opacity={0.9} />
-        <circle cx={cx - offset * 0.87} cy={cy + offset * 0.5} r={r} stroke="white" strokeWidth={sw} opacity={0.7} />
-        <circle cx={cx + offset * 0.87} cy={cy + offset * 0.5} r={r} stroke="white" strokeWidth={sw} opacity={0.8} />
-      </svg>
-    );
-  }
-
+// 使用 public/LOGO.png 图片
+export function AppLogo({ size = 24, className = "" }: { size?: number; className?: string; white?: boolean }) {
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none" className={className}>
-      <circle cx={cx} cy={cy - offset} r={r} stroke={`url(#${uid}-1)`} strokeWidth={sw} />
-      <circle cx={cx - offset * 0.87} cy={cy + offset * 0.5} r={r} stroke={`url(#${uid}-2)`} strokeWidth={sw} />
-      <circle cx={cx + offset * 0.87} cy={cy + offset * 0.5} r={r} stroke={`url(#${uid}-3)`} strokeWidth={sw} />
-      <defs>
-        <linearGradient id={`${uid}-1`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#3b82f6" />
-          <stop offset="100%" stopColor="#8b5cf6" />
-        </linearGradient>
-        <linearGradient id={`${uid}-2`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#8b5cf6" />
-          <stop offset="100%" stopColor="#ec4899" />
-        </linearGradient>
-        <linearGradient id={`${uid}-3`} x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor="#ec4899" />
-          <stop offset="100%" stopColor="#3b82f6" />
-        </linearGradient>
-      </defs>
-    </svg>
+    <img
+      src="/LOGO.png"
+      alt="OpenSpeech"
+      width={size}
+      height={size}
+      className={className}
+      style={{ objectFit: "contain" }}
+    />
   );
 }
 

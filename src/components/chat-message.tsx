@@ -4,6 +4,9 @@ import { memo, useState, useCallback } from "react";
 import { ImageEditor } from "./image-editor";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { oneDark } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { cn } from "@/lib/utils";
@@ -187,6 +190,7 @@ function GeneratedImages({
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [pendingAnnotation, setPendingAnnotation] = useState<string | null>(null);
   const [editInstruction, setEditInstruction] = useState("");
+  const [previewIdx, setPreviewIdx] = useState<number | null>(null);
 
   if (!images || images.length === 0) return null;
 
@@ -194,12 +198,12 @@ function GeneratedImages({
     <>
       <div className="mt-3 flex flex-wrap gap-3">
         {images.map((img, i) => (
-          <div key={i} className="relative group rounded-xl overflow-hidden border border-[var(--border)] shadow-sm">
+          <div key={i} className="relative group rounded-xl overflow-hidden border border-[var(--border)] shadow-sm cursor-pointer" onClick={() => setPreviewIdx(i)}>
             <img src={img} alt={`生成图片 ${i + 1}`} className="max-h-60 sm:max-h-80 max-w-full object-contain" />
             <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
               {onEditImage && (
                 <button
-                  onClick={() => setEditingIdx(i)}
+                  onClick={(e) => { e.stopPropagation(); setEditingIdx(i); }}
                   className="p-1.5 rounded-lg bg-black/50 text-white hover:bg-black/70"
                   title="标记编辑"
                 >
@@ -211,6 +215,7 @@ function GeneratedImages({
                 download={`openspeech-image-${i + 1}.png`}
                 className="p-1.5 rounded-lg bg-black/50 text-white hover:bg-black/70"
                 title="下载图片"
+                onClick={(e) => e.stopPropagation()}
               >
                 <Download size={14} />
               </a>
@@ -218,6 +223,41 @@ function GeneratedImages({
           </div>
         ))}
       </div>
+
+      {/* 图片预览弹窗 */}
+      {previewIdx !== null && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4" onClick={() => setPreviewIdx(null)}>
+          <div className="relative max-w-[90vw] max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img src={images[previewIdx]} alt="预览" className="max-w-full max-h-[85vh] object-contain rounded-lg" />
+            <div className="absolute top-3 right-3 flex gap-2">
+              {onEditImage && (
+                <button
+                  onClick={() => { setPreviewIdx(null); setEditingIdx(previewIdx); }}
+                  className="p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                  title="编辑"
+                >
+                  <Pencil size={16} />
+                </button>
+              )}
+              <a
+                href={images[previewIdx]}
+                download={`openspeech-image-${previewIdx + 1}.png`}
+                className="p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                title="下载"
+              >
+                <Download size={16} />
+              </a>
+              <button
+                onClick={() => setPreviewIdx(null)}
+                className="p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                title="关闭"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 图片编辑器弹窗 */}
       {editingIdx !== null && onEditImage && (
@@ -285,7 +325,8 @@ function MarkdownContent({ content }: { content: string }) {
   return (
     <div className="markdown-body text-sm">
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
+        rehypePlugins={[rehypeKatex]}
         components={{
           code({ node, className, children, ...props }) {
             const match = /language-(\w+)/.exec(className || "");
@@ -314,8 +355,9 @@ function MarkdownContent({ content }: { content: string }) {
 const TOOL_LABELS: Record<string, string> = {
   "deep-think": "🧠 Deep Think",
   "deep-research": "🔍 Deep Research",
-  canvas: "✏️ Canvas",
+  canvas: "✏️ 创意写作",
   "image-gen": "🎨 图片生成",
+  "mind-map": "🧩 生成脑图",
   tutor: "📚 学习辅导",
   "code-assist": "💻 代码助手",
   notebook: "📄 文档分析",
@@ -339,9 +381,9 @@ export const ChatMessage = memo(function ChatMessage({
       )}
     >
       {!isUser && (
-        <div className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
-          <span className="sm:hidden"><AppLogo size={14} /></span>
-          <span className="hidden sm:block"><AppLogo size={16} /></span>
+        <div className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center">
+          <span className="sm:hidden"><AppLogo size={24} /></span>
+          <span className="hidden sm:block"><AppLogo size={28} /></span>
         </div>
       )}
 

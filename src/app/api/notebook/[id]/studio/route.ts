@@ -144,11 +144,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     let generatedText: string;
     try {
       generatedText = await callAI({
-        systemPrompt: studioType.prompt,
+        systemPrompt: studioType.prompt + "\n\n**重要：无论资料是什么语言，你都必须使用中文回复。** 如果资料是英文或其他语言，请翻译成中文后输出。",
         contents: [
           {
             role: "user",
-            parts: [{ text: `以下是知识库的资料内容，请基于这些资料生成${studioType.label}：\n\n${sourceTexts}` }],
+            parts: [{ text: `以下是知识库的资料内容，请基于这些资料用中文生成${studioType.label}：\n\n${sourceTexts}` }],
           },
         ],
         temperature: 0.7,

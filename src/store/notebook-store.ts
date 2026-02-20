@@ -15,7 +15,7 @@ export interface Notebook {
 
 export interface NotebookSource {
   id: string;
-  type: "file" | "url" | "text" | "knowledge";
+  type: "file" | "url" | "text" | "video" | "knowledge";
   title: string;
   content: string;
   summary: string;
@@ -23,6 +23,8 @@ export interface NotebookSource {
     fileName?: string;
     fileType?: string;
     url?: string;
+    platform?: string;
+    author?: string;
     wordCount: number;
   };
   enabled: boolean;
@@ -109,6 +111,8 @@ interface NotebookStore {
 
   // 播客
   podcastData: PodcastData | null;
+  podcastNarration: PodcastData | null;
+  podcastDialogue: PodcastData | null;
   generatingPodcast: boolean;
 
   // UI 状态
@@ -134,6 +138,7 @@ interface NotebookStore {
   // Chat
   fetchChatHistory: (userId: string, notebookId: string) => Promise<void>;
   sendMessage: (userId: string, notebookId: string, message: string) => Promise<void>;
+  clearChatMessages: () => void;
 
   // Studio
   fetchStudioOutputs: (userId: string, notebookId: string) => Promise<void>;
@@ -142,6 +147,7 @@ interface NotebookStore {
   // Discussion
   fetchDiscussMessages: (userId: string, notebookId: string) => Promise<void>;
   sendDiscussMessage: (userId: string, notebookId: string, type: string, content: string, metadata?: Record<string, unknown>) => Promise<void>;
+  clearDiscussMessages: () => void;
 
   // Share
   fetchShareInfo: (userId: string, notebookId: string) => Promise<void>;
@@ -169,6 +175,8 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
   shareConfig: null,
   memberCount: 0,
   podcastData: null,
+  podcastNarration: null,
+  podcastDialogue: null,
   generatingPodcast: false,
   loadingSources: false,
   loadingChat: false,
@@ -372,6 +380,8 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
           chatMessages: [...s.chatMessages, assistantMsg],
           streamingResponse: "",
         }));
+        // 通知侧边栏刷新配额
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("chat-message-sent"));
       }
     } catch {}
     set({ loadingChat: false });
@@ -402,6 +412,8 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
           studioOutputs: { ...s.studioOutputs, [type]: data.output },
           studioTypes: s.studioTypes.map((t) => (t.key === type ? { ...t, generated: true } : t)),
         }));
+        // 通知侧边栏刷新配额
+        if (typeof window !== "undefined") window.dispatchEvent(new Event("chat-message-sent"));
       } else if (resp.status === 429) {
         try {
           const errData = await resp.json();
@@ -485,7 +497,11 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
       const resp = await fetch(`/api/notebook/${notebookId}/podcast?userId=${userId}`);
       if (resp.ok) {
         const data = await resp.json();
-        set({ podcastData: data.podcast || null });
+        set({
+          podcastData: data.podcast || null,
+          podcastNarration: data.podcastNarration || null,
+          podcastDialogue: data.podcastDialogue || null,
+        });
       }
     } catch {}
   },
@@ -500,7 +516,12 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
       });
       if (resp.ok) {
         const data = await resp.json();
-        set({ podcastData: data.podcast });
+        const podcast = data.podcast;
+        set((s) => ({
+          podcastData: podcast,
+          podcastNarration: mode === "narration" ? podcast : s.podcastNarration,
+          podcastDialogue: mode === "dialogue" ? podcast : s.podcastDialogue,
+        }));
       }
     } catch {}
     set({ generatingPodcast: false });
@@ -508,4 +529,7 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
 
   // UI
   setMiddleTab: (tab) => set({ middleTab: tab }),
+
+  clearChatMessages: () => set({ chatMessages: [] }),
+  clearDiscussMessages: () => set({ discussMessages: [] }),
 }));
