@@ -64,17 +64,9 @@ export async function POST(req: NextRequest) {
     const deviceKey = `${DEVICE_PREFIX}${fingerprint}`;
     const ipKey = `${IP_DEVICE_PREFIX}${ip}`;
 
-    // 1. 此设备已注册 → 检查是否已绑定邮箱
+    // 1. 此设备已注册 → 直接放行（已注册设备无需再次绑定邮箱）
     const existingDevice = await redis.get<DeviceRecord>(deviceKey);
     if (existingDevice) {
-      // 检查该用户是否已绑定邮箱
-      const account = await redis.get<{ email?: string }>(`${ACCOUNT_PREFIX}${existingDevice.userId}`);
-      if (!account?.email && !existingDevice.emailBound) {
-        return NextResponse.json({
-          error: "请先使用邮箱登录绑定账号",
-          needEmailBind: true,
-        }, { status: 403 });
-      }
       existingDevice.lastSeen = new Date().toISOString();
       await redis.set(deviceKey, existingDevice);
       return NextResponse.json({

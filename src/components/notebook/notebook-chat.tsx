@@ -155,7 +155,6 @@ export function NotebookChat({
                             components={{
                               p: ({ children }) => {
                                 const text = String(children);
-                                // 将【来源: ...】标注替换为小斜体灰色
                                 const parts = text.split(/(【来源[：:][^】]*】)/g);
                                 if (parts.length === 1) return <p>{children}</p>;
                                 return (
@@ -169,7 +168,7 @@ export function NotebookChat({
                                 );
                               },
                             }}
-                          >{msg.content}</ReactMarkdown>
+                          >{msg.content.replace(/<br\s*\/?>/gi, "  \n")}</ReactMarkdown>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap">{msg.content}</p>

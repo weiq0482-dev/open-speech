@@ -845,6 +845,7 @@ function SettingsTab({ session }: { session: AdminSession }) {
   const [modelProvider, setModelProvider] = useState<"gemini" | "qwen">("qwen");
   const [qwenApiKey, setQwenApiKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
+  const [videoRetentionDays, setVideoRetentionDays] = useState(90);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -867,6 +868,9 @@ function SettingsTab({ session }: { session: AdminSession }) {
         setGeminiApiKey(d.settings.geminiApiKey || "");
       }
     }).catch(() => {});
+    adminFetch("/api/admin/site-config", session).then((r) => r.json()).then((d) => {
+      if (d.config) setVideoRetentionDays(d.config.videoRetentionDays || 90);
+    }).catch(() => {});
     adminFetch("/api/admin/plans", session).then((r) => r.json()).then((d) => {
       if (d.plans) setPlans(d.plans);
     }).catch(() => {});
@@ -878,6 +882,10 @@ function SettingsTab({ session }: { session: AdminSession }) {
       await adminFetch("/api/admin/settings", session, {
         method: "POST",
         body: JSON.stringify({ freeTrialDays, freeDailyLimit, modelProvider, qwenApiKey, geminiApiKey }),
+      });
+      await adminFetch("/api/admin/site-config", session, {
+        method: "POST",
+        body: JSON.stringify({ videoRetentionDays }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -1151,6 +1159,23 @@ function SettingsTab({ session }: { session: AdminSession }) {
             onChange={(e) => setFreeDailyLimit(Number(e.target.value))}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
           />
+        </div>
+      </div>
+
+      {/* 视频设置 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <h3 className="text-sm font-semibold">视频设置</h3>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">视频保留天数（天）</label>
+          <input
+            type="number"
+            min={1}
+            max={365}
+            value={videoRetentionDays}
+            onChange={(e) => setVideoRetentionDays(Number(e.target.value))}
+            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+          />
+          <p className="text-xs text-gray-400 mt-1">用户生成的视频将在此天数后自动清理，默认 90 天</p>
         </div>
       </div>
 

@@ -13,6 +13,7 @@ import {
   Calendar,
   MindmapList,
   DocDetail,
+  AlarmClock,
 } from "@icon-park/react";
 
 import ReactMarkdown from "react-markdown";
@@ -43,6 +44,12 @@ export function NotebookStudio({
   notebookId: string;
   userId: string;
 }) {
+  const [videoRetentionDays, setVideoRetentionDays] = useState(90);
+  useEffect(() => {
+    fetch("/api/site-config").then((r) => r.json()).then((d) => {
+      if (d.config?.videoRetentionDays) setVideoRetentionDays(d.config.videoRetentionDays);
+    }).catch(() => {});
+  }, []);
   const {
     studioTypes,
     studioOutputs,
@@ -262,7 +269,10 @@ export function NotebookStudio({
                   </div>
                   <ChevronRight size={12} className="text-[var(--muted)]" />
                 </button>
-                <p className="text-[9px] text-orange-500 mt-1.5 px-1">⏰ 生成的视频最多保留 90 天，请及时下载，到期自动清理</p>
+                <p className="text-[9px] text-orange-500 mt-1.5 px-1 flex items-center gap-1">
+                  <AlarmClock size={11} theme="outline" strokeWidth={3} />
+                  生成的视频最多保留 {videoRetentionDays} 天，请及时下载，到期自动清理
+                </p>
               </>
             )}
           </div>

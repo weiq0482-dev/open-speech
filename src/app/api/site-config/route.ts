@@ -23,6 +23,7 @@ export interface SiteConfig {
   wechatDesc: string;
   contactWechatId: string;
   contactQrUrl: string;
+  videoRetentionDays: number;
 }
 
 const DEFAULT_CONFIG: SiteConfig = {
@@ -34,6 +35,7 @@ const DEFAULT_CONFIG: SiteConfig = {
   wechatDesc: "微信扫码 · 把想法变成现实",
   contactWechatId: "jryg8686",
   contactQrUrl: "/wechat-qr.png",
+  videoRetentionDays: 90,
 };
 
 // GET: 前端读取站点配置

@@ -303,9 +303,9 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
               className={cn(
                 "flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors",
                 step === s.key
-                  ? "bg-purple-500 text-white"
+                  ? "bg-blue-500 text-white"
                   : i < stepIndex
-                    ? "text-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                    ? "text-blue-500 bg-blue-50 dark:bg-blue-900/20"
                     : "text-[var(--muted)]"
               )}
             >
@@ -339,8 +339,8 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     className={cn(
                       "flex items-center gap-2 px-3 py-2 rounded-lg text-left text-xs transition-all border",
                       videoMode === m.id
-                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                        : "border-[var(--border)] hover:border-purple-300"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-[var(--border)] hover:border-blue-300"
                     )}
                   >
                     <span className="text-sm">{m.label.split(" ")[0]}</span>
@@ -363,13 +363,13 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
               <label className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 block">内容来源</label>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
-                  { id: "ai_analysis" as const, label: "📚 知识库", desc: "AI分析资料" },
+                  { id: "ai_analysis" as const, label: "📚 知识库", desc: "Studio成果" },
                   { id: "discussion" as const, label: "💬 讨论组", desc: "多人讨论精华" },
                   { id: "mixed" as const, label: "🔀 混合", desc: "两者结合" },
                 ]).map((s) => (
                   <button key={s.id} onClick={() => setContentSource(s.id)}
                     className={cn("px-2 py-2 rounded-lg text-[10px] text-center border transition-all",
-                      contentSource === s.id ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20" : "border-[var(--border)] hover:border-purple-300")}>
+                      contentSource === s.id ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-[var(--border)] hover:border-blue-300")}>
                     <p className="font-medium text-xs">{s.label}</p>
                     <p className="text-[var(--muted)]">{s.desc}</p>
                   </button>
@@ -384,7 +384,8 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                 {[1, 2, 3].map((n) => (
                   <button key={n} onClick={() => { setSpeakerCount(n); setSpeakerNames((prev) => { const arr = [...prev]; while (arr.length < n) arr.push(n === 2 ? "嘉宾A" : "嘉宾B"); return arr.slice(0, n); }); }}
                     className={cn("px-3 py-1.5 rounded-lg text-[10px] border transition-all",
-                      speakerCount === n ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20" : "border-[var(--border)] hover:border-purple-300")}>
+                      speakerCount === n ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-[var(--border)] hover:border-blue-300")}
+                  >
                     {n === 1 ? "👤 单人" : n === 2 ? "👥 双人" : "👥 三人"}
                   </button>
                 ))}
@@ -394,7 +395,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                   {speakerNames.map((name, i) => (
                     <input key={i} type="text" value={name} onChange={(e) => { const arr = [...speakerNames]; arr[i] = e.target.value; setSpeakerNames(arr); }}
                       placeholder={`角色${i+1}`} maxLength={8}
-                      className="flex-1 px-2 py-1 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-purple-500" />
+                      className="flex-1 px-2 py-1 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-blue-500" />
                   ))}
                 </div>
               )}
@@ -412,8 +413,8 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     className={cn(
                       "px-2.5 py-2 rounded-lg text-[10px] text-center transition-all border",
                       videoStyle === s.id
-                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                        : "border-[var(--border)] hover:border-purple-300"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-[var(--border)] hover:border-blue-300"
                     )}
                   >
                     <p className="font-medium text-xs">{s.label}</p>
@@ -456,7 +457,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     onClick={() => setTheme(t.id)}
                     className={cn(
                       "flex flex-col items-center gap-1",
-                      theme === t.id && "ring-2 ring-purple-500 ring-offset-1 rounded-lg"
+                      theme === t.id && "ring-2 ring-blue-500 ring-offset-1 rounded-lg"
                     )}
                   >
                     <div
@@ -500,8 +501,8 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     className={cn(
                       "px-2 py-1.5 rounded text-[10px] text-left transition-all border",
                       voiceId === v.id
-                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                        : "border-[var(--border)] hover:border-purple-300"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-[var(--border)] hover:border-blue-300"
                     )}
                   >
                     <span className="font-medium">{v.name}</span>
@@ -524,8 +525,8 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                   className={cn(
                     "px-2 py-1.5 rounded text-[10px] text-center border transition-all",
                     !selectedBgm
-                      ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                      : "border-[var(--border)] hover:border-purple-300"
+                      ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                      : "border-[var(--border)] hover:border-blue-300"
                   )}
                 >🔇 无背景音乐</button>
                 {recommendBGM(videoStyle).map((bgm) => (
@@ -535,8 +536,8 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     className={cn(
                       "px-2 py-1.5 rounded text-[10px] text-left border transition-all",
                       selectedBgm === bgm.id
-                        ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                        : "border-[var(--border)] hover:border-purple-300"
+                        ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
+                        : "border-[var(--border)] hover:border-blue-300"
                     )}
                   >
                     <span className="font-medium">{bgm.name}</span>
@@ -555,7 +556,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
               <div className="space-y-2">
                 <div className="flex items-center gap-3">
                   <label className="flex items-center gap-1.5 text-[10px] cursor-pointer">
-                    <input type="checkbox" checked={showSubtitles} onChange={(e) => setShowSubtitles(e.target.checked)} className="accent-purple-500" />
+                    <input type="checkbox" checked={showSubtitles} onChange={(e) => setShowSubtitles(e.target.checked)} className="accent-blue-500" />
                     显示字幕
                   </label>
                   {showSubtitles && (
@@ -567,7 +568,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                           className={cn(
                             "px-2 py-0.5 rounded text-[9px] border",
                             subtitleStyle === pos
-                              ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
+                              ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
                               : "border-[var(--border)]"
                           )}
                         >{pos === "bottom" ? "底部" : "居中"}</button>
@@ -581,7 +582,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                   onChange={(e) => setWatermarkText(e.target.value)}
                   placeholder="水印文字（如：@你的账号）"
                   maxLength={20}
-                  className="w-full px-2.5 py-1.5 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-purple-500"
+                  className="w-full px-2.5 py-1.5 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-blue-500"
                 />
               </div>
             </div>
@@ -596,7 +597,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
               <p className="text-[10px] text-[var(--muted)]">{script.videoDescription}</p>
               <div className="flex gap-1 mt-2 flex-wrap">
                 {script.tags.map((tag, i) => (
-                  <span key={i} className="px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[9px]">
+                  <span key={i} className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[9px]">
                     #{tag}
                   </span>
                 ))}
@@ -640,7 +641,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
             <button
               onClick={generateScript}
               disabled={loading}
-              className="flex items-center gap-1 text-[10px] text-purple-500 hover:text-purple-600"
+              className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-600"
             >
               <RotateCcw size={10} />
               不满意？重新生成脚本
@@ -718,7 +719,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                 <button
                   onClick={generateAudio}
                   disabled={loading}
-                  className="px-4 py-2 rounded-lg bg-purple-500 text-white text-xs font-medium hover:bg-purple-600 disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600 disabled:opacity-50"
                 >
                   {loading ? (
                     <span className="flex items-center gap-1"><Loader2 size={12} className="animate-spin" />生成中...</span>
@@ -768,13 +769,13 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                   <span className="text-[10px]">{exportProgress.message}</span>
                 </div>
                 <div className="w-full h-1.5 bg-[var(--sidebar-hover)] rounded-full overflow-hidden">
-                  <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${exportProgress.progress}%` }} />
+                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${exportProgress.progress}%` }} />
                 </div>
               </div>
             ) : (
               <button
                 onClick={handleExport}
-                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-purple-500 text-white text-xs font-medium hover:bg-purple-600"
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600"
               >
                 <Download size={12} />
                 导出视频
@@ -785,7 +786,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
             <button
               onClick={handlePublishSuggestions}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-purple-300 dark:border-purple-700 text-purple-500 text-[11px] font-medium hover:bg-purple-50 dark:hover:bg-purple-900/10"
+              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg border border-blue-300 dark:border-blue-700 text-blue-500 text-[11px] font-medium hover:bg-blue-50 dark:hover:bg-blue-900/10"
             >
               <Share2 size={12} />
               {loading ? "生成中..." : "获取发布建议"}
@@ -805,7 +806,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                           const text = `${ps.titleTip}\n\n${ps.tags.map((t) => `#${t}`).join(" ")}`;
                           navigator.clipboard.writeText(text).then(() => alert(`已复制「${ps.platform}」标题和标签到剪贴板`));
                         }}
-                        className="ml-auto text-purple-500 hover:text-purple-600"
+                        className="ml-auto text-blue-500 hover:text-blue-600"
                         title="复制标题和标签"
                       >
                         <Copy size={10} />
@@ -814,15 +815,15 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     <p className="text-[var(--fg)] mb-0.5">{ps.titleTip}</p>
                     <div className="flex flex-wrap gap-1">
                       {ps.tags.slice(0, 5).map((tag, j) => (
-                        <span key={j} className="px-1 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[8px]">#{tag}</span>
+                        <span key={j} className="px-1 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[8px]">#{tag}</span>
                       ))}
                     </div>
                   </div>
                 ))}
 
                 {/* 一键发布入口 */}
-                <div className="mt-2 p-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800">
-                  <p className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 mb-2">🚀 一键发布到各平台</p>
+                <div className="mt-2 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800">
+                  <p className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 mb-2">🚀 一键发布到各平台</p>
                   <div className="grid grid-cols-3 gap-1.5">
                     {[
                       { id: "douyin", name: "抖音", icon: "📱", url: "https://creator.douyin.com/creator-micro/content/upload" },
@@ -833,7 +834,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                       { id: "youtube", name: "YouTube", icon: "▶️", url: "https://studio.youtube.com/channel/UC/videos/upload" },
                     ].map((p) => (
                       <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-purple-200 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/20 text-[10px] transition-colors">
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-100 dark:hover:bg-blue-900/20 text-[10px] transition-colors">
                         <span>{p.icon}</span>
                         <span className="font-medium">{p.name}</span>
                       </a>
@@ -848,7 +849,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
             <div className="border-t border-[var(--border)] pt-2">
               <button
                 onClick={() => setShowBatch(!showBatch)}
-                className="flex items-center gap-1 text-[10px] text-purple-500 hover:text-purple-600"
+                className="flex items-center gap-1 text-[10px] text-blue-500 hover:text-blue-600"
               >
                 <Layers size={10} />
                 {showBatch ? "收起批量生成" : "批量生成多条视频"}
@@ -858,13 +859,13 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                   <p className="text-[10px] text-[var(--muted)]">从同一知识库拆分生成多条不同角度的视频</p>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px]">数量：</span>
-                    <input type="range" min={2} max={10} value={batchCount} onChange={(e) => setBatchCount(Number(e.target.value))} className="flex-1 accent-purple-500" />
+                    <input type="range" min={2} max={10} value={batchCount} onChange={(e) => setBatchCount(Number(e.target.value))} className="flex-1 accent-blue-500" />
                     <span className="text-[10px] font-mono w-4">{batchCount}</span>
                   </div>
                   <button
                     onClick={handleBatchGenerate}
                     disabled={loading}
-                    className="w-full py-1.5 rounded-lg bg-purple-500 text-white text-[10px] font-medium hover:bg-purple-600 disabled:opacity-50"
+                    className="w-full py-1.5 rounded-lg bg-blue-500 text-white text-[10px] font-medium hover:bg-blue-600 disabled:opacity-50"
                   >
                     {loading ? "生成中..." : `一键生成 ${batchCount} 条视频脚本`}
                   </button>
@@ -872,12 +873,12 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     <div className="space-y-1">
                       {batchScripts.map((bs, i) => (
                         <div key={i} className="flex items-center gap-2 p-1.5 rounded bg-[var(--sidebar-hover)] text-[10px]">
-                          <span className="bg-purple-500 text-white px-1 py-0.5 rounded text-[8px]">{i+1}</span>
+                          <span className="bg-blue-500 text-white px-1 py-0.5 rounded text-[8px]">{i+1}</span>
                           <span className="flex-1 truncate">{bs.videoTitle}</span>
                           <span className="text-[var(--muted)]">{Math.round(bs.totalDuration)}s</span>
                           <button
                             onClick={() => { setScript(bs); setStep("script"); setShowBatch(false); }}
-                            className="text-purple-500 hover:text-purple-600"
+                            className="text-blue-500 hover:text-blue-600"
                           >使用</button>
                         </div>
                       ))}
@@ -905,10 +906,10 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
           onClick={handleNext}
           disabled={loading || (step === "preview")}
           className={cn(
-            "flex items-center gap-1 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors",
+            "flex items-center gap-1 px-4 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap",
             loading
               ? "bg-gray-300 text-gray-500"
-              : "bg-purple-500 text-white hover:bg-purple-600"
+              : "bg-blue-500 text-white hover:bg-blue-600"
           )}
         >
           {loading ? (

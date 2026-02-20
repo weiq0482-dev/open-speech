@@ -10,6 +10,7 @@ const DEFAULT_SITE_CONFIG = {
   wechatDesc: "微信扫码 · 把想法变成现实",
   contactWechatId: "jryg8686",
   contactQrUrl: "/wechat-qr.png",
+  videoRetentionDays: 90,
 };
 
 export async function GET(req: NextRequest) {
