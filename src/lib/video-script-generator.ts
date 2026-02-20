@@ -25,6 +25,7 @@ export interface VideoScript {
 
 export type VideoStyle = "knowledge" | "news" | "story" | "product";
 export type VideoRatio = "16:9" | "9:16" | "1:1";
+export type ContentSource = "ai_analysis" | "discussion" | "mixed";
 
 interface GenerateScriptOptions {
   notebookId: string;
@@ -32,17 +33,47 @@ interface GenerateScriptOptions {
   ratio?: VideoRatio;
   targetDuration?: number; // 目标时长（秒），默认180
   language?: string;
+  contentSource?: ContentSource; // 内容来源
+  speakerCount?: number;         // 讲述人数（1-3）
+  speakerNames?: string[];       // 讲述人名称
+}
+
+// 收集讨论组内容
+async function collectDiscussionTexts(redis: ReturnType<typeof getRedis>, notebookId: string): Promise<string> {
+  try {
+    const messages = await redis.lrange(`nb_discuss:${notebookId}`, 0, -1);
+    if (!messages || messages.length === 0) return "";
+    return messages.map((msg: unknown) => {
+      const m = (typeof msg === "string" ? JSON.parse(msg) : msg) as { userName?: string; content?: string };
+      return `【${m.userName || "匿名"}】${m.content || ""}`;
+    }).join("\n");
+  } catch {
+    return "";
+  }
 }
 
 // 生成视频分镜脚本
 export async function generateVideoScript(opts: GenerateScriptOptions): Promise<VideoScript> {
   const redis = getRedis();
-  const sourceTexts = await collectSourceTexts(redis, opts.notebookId);
-  if (!sourceTexts) throw new Error("知识库没有可用的来源内容");
+  const contentSource = opts.contentSource || "ai_analysis";
+
+  // 根据来源收集素材
+  let sourceTexts = "";
+  let discussTexts = "";
+
+  if (contentSource === "ai_analysis" || contentSource === "mixed") {
+    sourceTexts = await collectSourceTexts(redis, opts.notebookId);
+  }
+  if (contentSource === "discussion" || contentSource === "mixed") {
+    discussTexts = await collectDiscussionTexts(redis, opts.notebookId);
+  }
+
+  const combinedContent = [sourceTexts, discussTexts].filter(Boolean).join("\n\n---讨论组精华---\n\n");
+  if (!combinedContent) throw new Error("没有可用的内容（请添加知识库来源或讨论组内容）");
 
   const style = opts.style || "knowledge";
   const targetDuration = opts.targetDuration || 180;
-  const sceneCount = Math.max(5, Math.round(targetDuration / 20)); // 每个场景约20秒
+  const sceneCount = Math.max(5, Math.round(targetDuration / 20));
 
   const stylePrompts: Record<VideoStyle, string> = {
     knowledge: "知识科普风格：清晰、有条理、易于理解，适合教育类短视频",
@@ -51,11 +82,22 @@ export async function generateVideoScript(opts: GenerateScriptOptions): Promise<
     product: "产品介绍风格：突出卖点、有说服力、结构清晰，适合营销类短视频",
   };
 
+  // 多人讲述提示
+  const speakerHint = (opts.speakerCount && opts.speakerCount > 1)
+    ? `\n讲述人数：${opts.speakerCount}人（${(opts.speakerNames || []).join("、") || "主讲人、嘉宾"}），每个场景的narration需要标注讲述人，格式为「【人名】台词内容」，多人可以在同一场景对话交替。`
+    : "";
+
+  const sourceHint = contentSource === "discussion"
+    ? "\n注意：素材来自多人讨论，请提炼讨论中的核心观点和精彩发言，保留讨论的碰撞感。"
+    : contentSource === "mixed"
+    ? "\n注意：素材包含知识库资料和讨论组内容，请将两者融合，既有知识深度又有讨论活力。"
+    : "";
+
   const prompt = `你是一个专业的短视频编导。基于以下资料，生成一个结构化的视频分镜脚本。
 
 风格要求：${stylePrompts[style]}
 目标时长：约${targetDuration}秒
-分镜数量：${sceneCount}个场景
+分镜数量：${sceneCount}个场景${speakerHint}${sourceHint}
 
 你必须严格按照以下 JSON 格式输出，不要输出其他内容：
 {
@@ -86,7 +128,7 @@ export async function generateVideoScript(opts: GenerateScriptOptions): Promise<
     systemPrompt: prompt,
     contents: [{
       role: "user",
-      parts: [{ text: `以下是知识库资料，请生成视频分镜脚本：\n\n${sourceTexts.slice(0, 50000)}` }],
+      parts: [{ text: `以下是素材内容，请生成视频分镜脚本：\n\n${combinedContent.slice(0, 50000)}` }],
     }],
     temperature: 0.8,
     maxOutputTokens: 8192,

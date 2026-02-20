@@ -76,6 +76,10 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
   const [theme, setTheme] = useState<string>("dark");
   const [duration, setDuration] = useState(180);
   const [voiceId, setVoiceId] = useState("longxiaochun");
+  // 内容来源 & 多人讲述
+  const [contentSource, setContentSource] = useState<"ai_analysis" | "discussion" | "mixed">("ai_analysis");
+  const [speakerCount, setSpeakerCount] = useState(1);
+  const [speakerNames, setSpeakerNames] = useState<string[]>(["主讲人"]);
 
   // BGM & 字幕
   const [selectedBgm, setSelectedBgm] = useState<string>("");
@@ -117,7 +121,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
       const resp = await fetch(`/api/notebook/${notebookId}/video`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, action: "generate_script", style: videoStyle, targetDuration: duration }),
+        body: JSON.stringify({ userId, action: "generate_script", style: videoStyle, targetDuration: duration, contentSource, speakerCount, speakerNames }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || "脚本生成失败");
@@ -127,7 +131,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
       setError(err instanceof Error ? err.message : "脚本生成失败");
     }
     setLoading(false);
-  }, [notebookId, userId, videoStyle, duration]);
+  }, [notebookId, userId, videoStyle, duration, contentSource, speakerCount, speakerNames]);
 
   const runCompliance = useCallback(async () => {
     setLoading(true);
@@ -351,6 +355,49 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                   需要在「用户设置」中上传数字人形象照和声音样本
                 </p>
               )}
+            </div>
+
+            {/* 内容来源 */}
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 block">内容来源</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {([
+                  { id: "ai_analysis" as const, label: "📚 知识库", desc: "AI分析资料" },
+                  { id: "discussion" as const, label: "💬 讨论组", desc: "多人讨论精华" },
+                  { id: "mixed" as const, label: "🔀 混合", desc: "两者结合" },
+                ]).map((s) => (
+                  <button key={s.id} onClick={() => setContentSource(s.id)}
+                    className={cn("px-2 py-2 rounded-lg text-[10px] text-center border transition-all",
+                      contentSource === s.id ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20" : "border-[var(--border)] hover:border-purple-300")}>
+                    <p className="font-medium text-xs">{s.label}</p>
+                    <p className="text-[var(--muted)]">{s.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 多人讲述 */}
+            <div>
+              <label className="text-[11px] font-semibold text-[var(--muted)] uppercase tracking-wider mb-2 block">讲述人数</label>
+              <div className="flex gap-1.5 mb-2">
+                {[1, 2, 3].map((n) => (
+                  <button key={n} onClick={() => { setSpeakerCount(n); setSpeakerNames((prev) => { const arr = [...prev]; while (arr.length < n) arr.push(n === 2 ? "嘉宾A" : "嘉宾B"); return arr.slice(0, n); }); }}
+                    className={cn("px-3 py-1.5 rounded-lg text-[10px] border transition-all",
+                      speakerCount === n ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20" : "border-[var(--border)] hover:border-purple-300")}>
+                    {n === 1 ? "👤 单人" : n === 2 ? "👥 双人" : "👥 三人"}
+                  </button>
+                ))}
+              </div>
+              {speakerCount > 1 && (
+                <div className="flex gap-1.5">
+                  {speakerNames.map((name, i) => (
+                    <input key={i} type="text" value={name} onChange={(e) => { const arr = [...speakerNames]; arr[i] = e.target.value; setSpeakerNames(arr); }}
+                      placeholder={`角色${i+1}`} maxLength={8}
+                      className="flex-1 px-2 py-1 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-purple-500" />
+                  ))}
+                </div>
+              )}
+              {speakerCount > 1 && <p className="text-[9px] text-[var(--muted)] mt-1">多人讲述：角色名称需与「用户设置→数字人角色」一致，声音将自动匹配</p>}
             </div>
 
             {/* 内容风格 */}
@@ -752,7 +799,16 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                       <span>{ps.icon}</span>
                       <span className="font-semibold">{ps.platform}</span>
                       <span className="text-[var(--muted)]">{ps.ratio}</span>
-                      <span className="text-[var(--muted)] ml-auto">{ps.bestTime}</span>
+                      <button
+                        onClick={() => {
+                          const text = `${ps.titleTip}\n\n${ps.tags.map((t) => `#${t}`).join(" ")}`;
+                          navigator.clipboard.writeText(text).then(() => alert(`已复制「${ps.platform}」标题和标签到剪贴板`));
+                        }}
+                        className="ml-auto text-purple-500 hover:text-purple-600"
+                        title="复制标题和标签"
+                      >
+                        <Copy size={10} />
+                      </button>
                     </div>
                     <p className="text-[var(--fg)] mb-0.5">{ps.titleTip}</p>
                     <div className="flex flex-wrap gap-1">
@@ -762,6 +818,28 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                     </div>
                   </div>
                 ))}
+
+                {/* 一键发布入口 */}
+                <div className="mt-2 p-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-800">
+                  <p className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 mb-2">🚀 一键发布到各平台</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { id: "douyin", name: "抖音", icon: "📱", url: "https://creator.douyin.com/creator-micro/content/upload" },
+                      { id: "bilibili", name: "B站", icon: "📺", url: "https://member.bilibili.com/platform/upload/video/frame" },
+                      { id: "xiaohongshu", name: "小红书", icon: "📕", url: "https://creator.xiaohongshu.com/publish/publish" },
+                      { id: "weixin", name: "视频号", icon: "💬", url: "https://channels.weixin.qq.com/platform/post/create" },
+                      { id: "kuaishou", name: "快手", icon: "⚡", url: "https://cp.kuaishou.com/article/publish/video" },
+                      { id: "youtube", name: "YouTube", icon: "▶️", url: "https://studio.youtube.com/channel/UC/videos/upload" },
+                    ].map((p) => (
+                      <a key={p.id} href={p.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1 px-2 py-1.5 rounded-lg border border-purple-200 dark:border-purple-700 hover:bg-purple-100 dark:hover:bg-purple-900/20 text-[10px] transition-colors">
+                        <span>{p.icon}</span>
+                        <span className="font-medium">{p.name}</span>
+                      </a>
+                    ))}
+                  </div>
+                  <p className="text-[8px] text-[var(--muted)] mt-1.5">点击后跳转到对应平台创作者后台，上传已导出的视频文件。请先在「用户设置→数字人/视频」中绑定平台账号。</p>
+                </div>
               </div>
             )}
 

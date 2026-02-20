@@ -246,6 +246,9 @@ export function NotebookStudio({
 }
 
 // ========== 播客面板 ==========
+// 数字人声音配置类型
+interface DigitalHumanVoice { id: string; name: string; voiceId: string; }
+
 function PodcastPanel({
   notebookId,
   userId,
@@ -265,14 +268,33 @@ function PodcastPanel({
   onClose: () => void;
 }) {
   const [mode, setMode] = useState<"narration" | "dialogue">("narration");
-  // 当前模式对应的播客数据
   const podcastData = mode === "narration" ? podcastNarration : podcastDialogue;
   const [playing, setPlaying] = useState(false);
   const [currentSegment, setCurrentSegment] = useState(0);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  // 加载用户数字人声音配置
+  const [digitalHumanVoices, setDigitalHumanVoices] = useState<DigitalHumanVoice[]>([]);
+  const [hostVoice, setHostVoice] = useState("");
+  const [guestVoice, setGuestVoice] = useState("");
+  useEffect(() => {
+    fetch(`/api/video-settings?userId=${userId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        const humans = data.settings?.digitalHumans || [];
+        const voices = humans.map((h: { id: string; name: string; voiceId: string }) => ({ id: h.id, name: h.name, voiceId: h.voiceId }));
+        setDigitalHumanVoices(voices);
+        if (voices.length > 0 && !hostVoice) setHostVoice(voices[0].voiceId);
+        if (voices.length > 1 && !guestVoice) setGuestVoice(voices[1].voiceId);
+      })
+      .catch(() => {});
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleGenerate = () => {
-    generatePodcast(userId, notebookId, mode);
+    const voices: Record<string, string> = {};
+    if (hostVoice) voices.host = hostVoice;
+    if (guestVoice && mode === "dialogue") voices.guest = guestVoice;
+    generatePodcast(userId, notebookId, mode, Object.keys(voices).length > 0 ? voices : undefined);
   };
 
   const handlePlay = () => {
@@ -357,6 +379,37 @@ function PodcastPanel({
           </button>
         ))}
       </div>
+
+      {/* 数字人声音选择（如有配置） */}
+      {digitalHumanVoices.length > 0 && (
+        <div className="p-2 rounded-md bg-[var(--card)] border border-[var(--border)] space-y-1.5">
+          <p className="text-[9px] text-[var(--muted)]">🎤 使用数字人声音配音</p>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[9px] text-[var(--muted)] w-8">主播:</span>
+            <div className="flex gap-1 flex-1">
+              {digitalHumanVoices.map((v) => (
+                <button key={v.id} onClick={() => setHostVoice(v.voiceId)}
+                  className={cn("px-1.5 py-0.5 rounded text-[8px] border", hostVoice === v.voiceId ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20" : "border-[var(--border)]")}>
+                  {v.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          {mode === "dialogue" && (
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-[var(--muted)] w-8">嘉宾:</span>
+              <div className="flex gap-1 flex-1">
+                {digitalHumanVoices.map((v) => (
+                  <button key={v.id} onClick={() => setGuestVoice(v.voiceId)}
+                    className={cn("px-1.5 py-0.5 rounded text-[8px] border", guestVoice === v.voiceId ? "border-orange-500 bg-orange-50 dark:bg-orange-900/20" : "border-[var(--border)]")}>
+                    {v.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 生成/播放按钮 */}
       <div className="flex gap-1.5">

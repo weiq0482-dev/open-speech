@@ -3,16 +3,32 @@ import { getRedis, isValidUserId } from "@/lib/notebook-utils";
 
 const VIDEO_SETTINGS_KEY = "user_video_settings:";
 
-export interface VideoUserSettings {
-  // 配音设置
-  voiceId: string;
-  voiceSpeed: number;
-  // 声音克隆
-  cloneVoiceUrl: string;
-  voiceSampleUploaded: boolean;
-  // 数字人设置
-  avatarPhotoUrl: string;
+// 单个数字人角色
+export interface DigitalHumanProfile {
+  id: string;             // 唯一ID
+  name: string;           // 角色名称（如"主讲人"、"嘉宾A"）
+  avatarPhotoUrl: string; // 形象照URL
   avatarStyle: "formal" | "casual" | "cartoon";
+  voiceId: string;        // CosyVoice预置声音ID
+  cloneVoiceUrl: string;  // 声音克隆URL（用户上传后生成）
+  voiceSampleUploaded: boolean;
+}
+
+// 平台账号绑定
+export interface PlatformAccount {
+  platform: string;       // douyin | bilibili | xiaohongshu | weixin | kuaishou | youtube
+  accountName: string;    // 账号名称/昵称
+  accountId: string;      // 平台账号ID或链接
+  accessToken?: string;   // OAuth token（部分平台支持）
+  connected: boolean;
+}
+
+export interface VideoUserSettings {
+  // 多数字人（2-3个角色）
+  digitalHumans: DigitalHumanProfile[];
+  // 默认配音（无数字人时使用）
+  defaultVoiceId: string;
+  voiceSpeed: number;
   // 视频品牌
   watermarkText: string;
   openingTemplate: string;
@@ -21,6 +37,8 @@ export interface VideoUserSettings {
   defaultRatio: "16:9" | "9:16" | "1:1";
   defaultTheme: string;
   defaultStyle: string;
+  // 平台账号
+  platformAccounts: PlatformAccount[];
 }
 
 // GET: 获取用户视频设置
@@ -35,18 +53,18 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     settings: settings || {
-      voiceId: "longxiaochun",
+      digitalHumans: [
+        { id: "host", name: "主讲人", avatarPhotoUrl: "", avatarStyle: "formal", voiceId: "longxiaochun", cloneVoiceUrl: "", voiceSampleUploaded: false },
+      ],
+      defaultVoiceId: "longxiaochun",
       voiceSpeed: 1.0,
-      cloneVoiceUrl: "",
-      voiceSampleUploaded: false,
-      avatarPhotoUrl: "",
-      avatarStyle: "formal",
       watermarkText: "",
       openingTemplate: "",
       closingTemplate: "",
       defaultRatio: "9:16",
       defaultTheme: "dark",
       defaultStyle: "knowledge",
+      platformAccounts: [],
     },
   });
 }

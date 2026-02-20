@@ -71,24 +71,25 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
   const [saved, setSaved] = useState(false);
   const [tab, setTab] = useState<"profile" | "interests" | "video">("profile");
 
-  // 视频/数字人设置
-  const [videoSettings, setVideoSettings] = useState({
-    voiceId: "longxiaochun",
+  // 视频/数字人设置（多角色 + 平台账号）
+  const [videoSettings, setVideoSettings] = useState<{
+    digitalHumans: Array<{ id: string; name: string; avatarPhotoUrl: string; avatarStyle: "formal" | "casual" | "cartoon"; voiceId: string; cloneVoiceUrl: string; voiceSampleUploaded: boolean }>;
+    defaultVoiceId: string; voiceSpeed: number; watermarkText: string; openingTemplate: string; closingTemplate: string;
+    defaultRatio: "16:9" | "9:16" | "1:1"; defaultTheme: string; defaultStyle: string;
+    platformAccounts: Array<{ platform: string; accountName: string; accountId: string; connected: boolean }>;
+  }>({
+    digitalHumans: [{ id: "host", name: "主讲人", avatarPhotoUrl: "", avatarStyle: "formal", voiceId: "longxiaochun", cloneVoiceUrl: "", voiceSampleUploaded: false }],
+    defaultVoiceId: "longxiaochun",
     voiceSpeed: 1.0,
-    cloneVoiceUrl: "",
-    voiceSampleUploaded: false,
-    avatarPhotoUrl: "",
-    avatarStyle: "formal" as "formal" | "casual" | "cartoon",
     watermarkText: "",
     openingTemplate: "",
     closingTemplate: "",
-    defaultRatio: "9:16" as "16:9" | "9:16" | "1:1",
+    defaultRatio: "9:16",
     defaultTheme: "dark",
     defaultStyle: "knowledge",
+    platformAccounts: [],
   });
-  const [voiceSampleFile, setVoiceSampleFile] = useState<File | null>(null);
-  const [avatarPhotoFile, setAvatarPhotoFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [editingHumanIdx, setEditingHumanIdx] = useState(0);
 
   useEffect(() => {
     if (open) {
@@ -286,192 +287,192 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
           )}
 
           {/* Video/Digital Human Tab */}
-          {tab === "video" && (
+          {tab === "video" && (() => {
+            const VOICE_LIST = [
+              { id: "longxiaochun", name: "龙小淳", desc: "温柔知性 ★" },
+              { id: "longlaotie", name: "龙老铁", desc: "成熟稳重 ★" },
+              { id: "longshu", name: "龙叔", desc: "磁性低沉" },
+              { id: "longxiaoxia", name: "龙小夏", desc: "活泼甜美" },
+              { id: "longyue", name: "龙悦", desc: "新闻播报" },
+              { id: "longcheng", name: "龙城", desc: "新闻播报" },
+            ];
+            const PLATFORMS = [
+              { id: "douyin", name: "抖音", icon: "📱" },
+              { id: "bilibili", name: "B站", icon: "📺" },
+              { id: "xiaohongshu", name: "小红书", icon: "📕" },
+              { id: "weixin", name: "微信视频号", icon: "💬" },
+              { id: "kuaishou", name: "快手", icon: "⚡" },
+              { id: "youtube", name: "YouTube", icon: "▶️" },
+            ];
+            const humans = videoSettings.digitalHumans || [];
+            const currentHuman = humans[editingHumanIdx] || humans[0];
+            const updateHuman = (idx: number, patch: Record<string, unknown>) => {
+              setVideoSettings((s) => {
+                const arr = [...s.digitalHumans];
+                arr[idx] = { ...arr[idx], ...patch } as typeof arr[0];
+                return { ...s, digitalHumans: arr };
+              });
+            };
+            const addHuman = () => {
+              if (humans.length >= 3) return;
+              const id = humans.length === 1 ? "guest_a" : "guest_b";
+              const name = humans.length === 1 ? "嘉宾A" : "嘉宾B";
+              setVideoSettings((s) => ({
+                ...s,
+                digitalHumans: [...s.digitalHumans, { id, name, avatarPhotoUrl: "", avatarStyle: "formal" as const, voiceId: "longlaotie", cloneVoiceUrl: "", voiceSampleUploaded: false }],
+              }));
+              setEditingHumanIdx(humans.length);
+            };
+            const removeHuman = (idx: number) => {
+              if (humans.length <= 1) return;
+              setVideoSettings((s) => ({ ...s, digitalHumans: s.digitalHumans.filter((_, i) => i !== idx) }));
+              setEditingHumanIdx(0);
+            };
+            const getPlatformAccount = (pid: string) => (videoSettings.platformAccounts || []).find((a) => a.platform === pid);
+            const setPlatformAccount = (pid: string, patch: Record<string, unknown>) => {
+              setVideoSettings((s) => {
+                const accs = [...(s.platformAccounts || [])];
+                const idx = accs.findIndex((a) => a.platform === pid);
+                if (idx >= 0) { accs[idx] = { ...accs[idx], ...patch } as typeof accs[0]; }
+                else { accs.push({ platform: pid, accountName: "", accountId: "", connected: false, ...patch } as typeof accs[0]); }
+                return { ...s, platformAccounts: accs };
+              });
+            };
+
+            return (
             <div className="space-y-5">
-              {/* 数字人形象照 */}
+              {/* ====== 数字人角色管理（2-3人） ====== */}
               <div>
                 <label className="text-xs font-semibold text-[var(--muted)] mb-2 block flex items-center gap-1">
                   <Upload size={12} />
-                  数字人形象照
+                  数字人角色（最多3人，可用于视频和播客）
                 </label>
-                <p className="text-[10px] text-[var(--muted)] mb-2">
-                  上传一张正面免冠照，用于生成数字人视频形象（建议512x512以上）
-                </p>
-                <div className="flex items-center gap-3">
-                  <div className="w-20 h-20 rounded-xl border-2 border-dashed border-[var(--border)] flex items-center justify-center overflow-hidden bg-[var(--sidebar-hover)]">
-                    {avatarPreview || videoSettings.avatarPhotoUrl ? (
-                      <img
-                        src={avatarPreview || videoSettings.avatarPhotoUrl}
-                        alt="avatar"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User size={24} className="text-[var(--muted)] opacity-40" />
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-blue-300 cursor-pointer text-xs transition-colors">
-                      <Upload size={12} />
-                      选择照片
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
+                {/* 角色 Tab */}
+                <div className="flex items-center gap-1 mb-3">
+                  {humans.map((h, i) => (
+                    <button key={h.id} onClick={() => setEditingHumanIdx(i)}
+                      className={cn("px-2.5 py-1 rounded-lg text-[10px] border transition-colors", editingHumanIdx === i ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20 font-semibold" : "border-[var(--border)]")}>
+                      {h.name || `角色${i+1}`}
+                    </button>
+                  ))}
+                  {humans.length < 3 && (
+                    <button onClick={addHuman} className="px-2 py-1 rounded-lg text-[10px] border border-dashed border-[var(--border)] text-[var(--muted)] hover:border-blue-300">+ 添加</button>
+                  )}
+                </div>
+
+                {currentHuman && (
+                  <div className="p-3 rounded-lg border border-[var(--border)] space-y-3">
+                    {/* 角色名称 */}
+                    <div className="flex items-center gap-2">
+                      <input type="text" value={currentHuman.name} onChange={(e) => updateHuman(editingHumanIdx, { name: e.target.value })}
+                        placeholder="角色名称" maxLength={10}
+                        className="flex-1 px-2 py-1 rounded border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500" />
+                      {humans.length > 1 && (
+                        <button onClick={() => removeHuman(editingHumanIdx)} className="text-[9px] text-red-500 hover:text-red-600">删除</button>
+                      )}
+                    </div>
+                    {/* 形象照 */}
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-lg border-2 border-dashed border-[var(--border)] flex items-center justify-center overflow-hidden bg-[var(--sidebar-hover)]">
+                        {currentHuman.avatarPhotoUrl ? (
+                          <img src={currentHuman.avatarPhotoUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User size={20} className="text-[var(--muted)] opacity-40" />
+                        )}
+                      </div>
+                      <label className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[var(--border)] hover:border-blue-300 cursor-pointer text-[10px]">
+                        <Upload size={10} /> 上传形象照
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                           const file = e.target.files?.[0];
-                          if (file) {
-                            setAvatarPhotoFile(file);
-                            setAvatarPreview(URL.createObjectURL(file));
-                          }
-                        }}
-                      />
-                    </label>
-                    {avatarPhotoFile && (
-                      <p className="text-[10px] text-green-500 mt-1">已选择：{avatarPhotoFile.name}</p>
-                    )}
+                          if (file) updateHuman(editingHumanIdx, { avatarPhotoUrl: URL.createObjectURL(file) });
+                        }} />
+                      </label>
+                    </div>
+                    {/* 形象风格 */}
+                    <div className="flex gap-1.5">
+                      {(["formal", "casual", "cartoon"] as const).map((style) => (
+                        <button key={style} onClick={() => updateHuman(editingHumanIdx, { avatarStyle: style })}
+                          className={cn("px-2 py-0.5 rounded text-[9px] border", currentHuman.avatarStyle === style ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-[var(--border)]")}>
+                          {style === "formal" ? "🤵 正式" : style === "casual" ? "👕 休闲" : "🎭 卡通"}
+                        </button>
+                      ))}
+                    </div>
+                    {/* 声音选择 */}
+                    <div>
+                      <p className="text-[10px] text-[var(--muted)] mb-1">配音声音</p>
+                      <div className="grid grid-cols-3 gap-1">
+                        {VOICE_LIST.map((v) => (
+                          <button key={v.id} onClick={() => updateHuman(editingHumanIdx, { voiceId: v.id })}
+                            className={cn("px-1.5 py-1 rounded text-[9px] text-left border", currentHuman.voiceId === v.id ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20" : "border-[var(--border)]")}>
+                            <span className="font-medium">{v.name}</span> <span className="text-[var(--muted)]">{v.desc}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* 声音克隆 */}
+                    <div>
+                      <label className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[var(--border)] hover:border-blue-300 cursor-pointer text-[10px]">
+                        <Mic size={10} /> 上传声音样本（克隆）
+                        <input type="file" accept="audio/*" className="hidden" onChange={(e) => {
+                          if (e.target.files?.[0]) updateHuman(editingHumanIdx, { voiceSampleUploaded: true });
+                        }} />
+                      </label>
+                      {currentHuman.voiceSampleUploaded && <p className="text-[9px] text-blue-500 mt-1">已上传声音样本</p>}
+                    </div>
                   </div>
-                </div>
-                {/* 形象风格 */}
-                <div className="flex gap-2 mt-2">
-                  {(["formal", "casual", "cartoon"] as const).map((style) => (
-                    <button
-                      key={style}
-                      onClick={() => setVideoSettings((s) => ({ ...s, avatarStyle: style }))}
-                      className={cn(
-                        "px-3 py-1 rounded-lg text-[10px] border transition-colors",
-                        videoSettings.avatarStyle === style
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                          : "border-[var(--border)] hover:border-blue-300"
-                      )}
-                    >
-                      {style === "formal" ? "🤵 正式" : style === "casual" ? "👕 休闲" : "🎭 卡通"}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* 声音样本 */}
-              <div>
-                <label className="text-xs font-semibold text-[var(--muted)] mb-2 block flex items-center gap-1">
-                  <Mic size={12} />
-                  声音克隆（可选）
-                </label>
-                <p className="text-[10px] text-[var(--muted)] mb-2">
-                  上传 3-5 分钟的朗读录音，AI 将克隆你的声音用于视频配音
-                </p>
-                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[var(--border)] hover:border-blue-300 cursor-pointer text-xs transition-colors">
-                  <Mic size={12} />
-                  上传声音样本
-                  <input
-                    type="file"
-                    accept="audio/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        setVoiceSampleFile(file);
-                        setVideoSettings((s) => ({ ...s, voiceSampleUploaded: true }));
-                      }
-                    }}
-                  />
-                </label>
-                {voiceSampleFile && (
-                  <p className="text-[10px] text-green-500 mt-1">已选择：{voiceSampleFile.name}</p>
-                )}
-                {videoSettings.voiceSampleUploaded && !voiceSampleFile && (
-                  <p className="text-[10px] text-blue-500 mt-1">已上传声音样本</p>
                 )}
               </div>
 
-              {/* 默认配音声音 */}
+              {/* ====== 平台账号绑定 ====== */}
               <div>
                 <label className="text-xs font-semibold text-[var(--muted)] mb-2 block flex items-center gap-1">
-                  <Volume2 size={12} />
-                  默认配音声音
+                  <Video size={12} />
+                  发布平台账号
                 </label>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {[
-                    { id: "longxiaochun", name: "龙小淳", desc: "温柔知性 ★" },
-                    { id: "longlaotie", name: "龙老铁", desc: "成熟稳重 ★" },
-                    { id: "longshu", name: "龙叔", desc: "磁性低沉" },
-                    { id: "longxiaoxia", name: "龙小夏", desc: "活泼甜美" },
-                    { id: "longyue", name: "龙悦", desc: "新闻播报" },
-                    { id: "longcheng", name: "龙城", desc: "新闻播报" },
-                  ].map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => setVideoSettings((s) => ({ ...s, voiceId: v.id }))}
-                      className={cn(
-                        "px-2 py-1.5 rounded-lg text-[10px] text-left border transition-colors",
-                        videoSettings.voiceId === v.id
-                          ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                          : "border-[var(--border)] hover:border-blue-300"
-                      )}
-                    >
-                      <span className="font-medium">{v.name}</span>
-                      <span className="text-[var(--muted)] ml-1">{v.desc}</span>
-                    </button>
-                  ))}
+                <p className="text-[10px] text-[var(--muted)] mb-2">绑定账号后，可一键发布视频到各平台</p>
+                <div className="space-y-1.5">
+                  {PLATFORMS.map((p) => {
+                    const acc = getPlatformAccount(p.id);
+                    return (
+                      <div key={p.id} className="flex items-center gap-2 p-2 rounded-lg border border-[var(--border)]">
+                        <span className="text-sm">{p.icon}</span>
+                        <span className="text-[10px] font-medium w-16">{p.name}</span>
+                        <input type="text" value={acc?.accountName || ""} onChange={(e) => setPlatformAccount(p.id, { accountName: e.target.value })}
+                          placeholder="账号名称/昵称" className="flex-1 px-2 py-1 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-blue-500" />
+                        <input type="text" value={acc?.accountId || ""} onChange={(e) => setPlatformAccount(p.id, { accountId: e.target.value })}
+                          placeholder="账号ID/链接" className="flex-1 px-2 py-1 rounded border border-[var(--border)] bg-transparent text-[10px] outline-none focus:border-blue-500" />
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* 语速 */}
+              {/* ====== 语速 & 品牌 ====== */}
               <div>
-                <label className="text-xs font-semibold text-[var(--muted)] mb-2 block">
-                  语速：{videoSettings.voiceSpeed.toFixed(1)}x
-                </label>
-                <input
-                  type="range"
-                  min={0.5}
-                  max={2.0}
-                  step={0.1}
-                  value={videoSettings.voiceSpeed}
-                  onChange={(e) => setVideoSettings((s) => ({ ...s, voiceSpeed: parseFloat(e.target.value) }))}
-                  className="w-full accent-blue-500"
-                />
-                <div className="flex justify-between text-[9px] text-[var(--muted)]">
-                  <span>慢 0.5x</span>
-                  <span>正常 1.0x</span>
-                  <span>快 2.0x</span>
-                </div>
+                <label className="text-xs font-semibold text-[var(--muted)] mb-2 block">语速：{videoSettings.voiceSpeed.toFixed(1)}x</label>
+                <input type="range" min={0.5} max={2.0} step={0.1} value={videoSettings.voiceSpeed}
+                  onChange={(e) => setVideoSettings((s) => ({ ...s, voiceSpeed: parseFloat(e.target.value) }))} className="w-full accent-blue-500" />
               </div>
-
-              {/* 水印 */}
               <div>
                 <label className="text-xs font-semibold text-[var(--muted)] mb-1.5 block">视频水印/署名</label>
-                <input
-                  type="text"
-                  value={videoSettings.watermarkText}
-                  onChange={(e) => setVideoSettings((s) => ({ ...s, watermarkText: e.target.value }))}
-                  placeholder="如：@你的账号名"
-                  maxLength={30}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500"
-                />
+                <input type="text" value={videoSettings.watermarkText} onChange={(e) => setVideoSettings((s) => ({ ...s, watermarkText: e.target.value }))}
+                  placeholder="如：@你的账号名" maxLength={30} className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500" />
               </div>
-
-              {/* 开场白/结束语模板 */}
               <div>
                 <label className="text-xs font-semibold text-[var(--muted)] mb-1.5 block">默认开场白</label>
-                <textarea
-                  value={videoSettings.openingTemplate}
-                  onChange={(e) => setVideoSettings((s) => ({ ...s, openingTemplate: e.target.value }))}
-                  placeholder="如：大家好，我是XXX，今天给大家分享..."
-                  rows={2}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500 resize-none"
-                />
+                <textarea value={videoSettings.openingTemplate} onChange={(e) => setVideoSettings((s) => ({ ...s, openingTemplate: e.target.value }))}
+                  placeholder="如：大家好，我是XXX，今天给大家分享..." rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500 resize-none" />
               </div>
               <div>
                 <label className="text-xs font-semibold text-[var(--muted)] mb-1.5 block">默认结束语</label>
-                <textarea
-                  value={videoSettings.closingTemplate}
-                  onChange={(e) => setVideoSettings((s) => ({ ...s, closingTemplate: e.target.value }))}
-                  placeholder="如：如果觉得有帮助，记得点赞关注哦~"
-                  rows={2}
-                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500 resize-none"
-                />
+                <textarea value={videoSettings.closingTemplate} onChange={(e) => setVideoSettings((s) => ({ ...s, closingTemplate: e.target.value }))}
+                  placeholder="如：如果觉得有帮助，记得点赞关注哦~" rows={2}
+                  className="w-full px-3 py-2 rounded-lg border border-[var(--border)] bg-transparent text-xs outline-none focus:border-blue-500 resize-none" />
               </div>
             </div>
-          )}
+            );
+          })()}
 
         </div>
 

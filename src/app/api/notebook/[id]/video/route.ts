@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRedis, isValidUserId, NB_PREFIX } from "@/lib/notebook-utils";
-import { generateVideoScript, checkCompliance, type VideoScript, type VideoStyle } from "@/lib/video-script-generator";
+import { generateVideoScript, checkCompliance, type VideoScript, type VideoStyle, type ContentSource } from "@/lib/video-script-generator";
 import { batchGenerateScripts, generatePublishSuggestions } from "@/lib/video-batch-publish";
 import { canUse, deductQuota } from "@/lib/quota-store";
 
@@ -10,7 +10,7 @@ const NB_VIDEO = "nb_video:";
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json();
-    const { userId, action, style, targetDuration, count } = body;
+    const { userId, action, style, targetDuration, count, contentSource, speakerCount, speakerNames } = body;
     if (!userId || !isValidUserId(userId)) {
       return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
     }
@@ -34,6 +34,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         notebookId,
         style: (style as VideoStyle) || "knowledge",
         targetDuration: targetDuration || 180,
+        contentSource: (contentSource as ContentSource) || "ai_analysis",
+        speakerCount: speakerCount || 1,
+        speakerNames: speakerNames || [],
       });
 
       // 保存脚本
