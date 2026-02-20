@@ -6,7 +6,7 @@ import { canUse, deductQuota } from "@/lib/quota-store";
 const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string }> = {
   guide: {
     label: "学习指南",
-    icon: "📋",
+    icon: "Notebook",
     prompt: `基于以下资料，生成一份详细的学习指南。包含：
 1. 核心概念总结
 2. 学习路径建议（由浅入深）
@@ -16,14 +16,14 @@ const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string
   },
   faq: {
     label: "常见问题",
-    icon: "❓",
+    icon: "HelpCircle",
     prompt: `基于以下资料，生成 10-15 个常见问题及其详细解答（FAQ）。
 问题应覆盖资料中的核心内容，答案要具体、有用。
 格式：## Q: 问题 \n答案内容`,
   },
   outline: {
     label: "大纲摘要",
-    icon: "📊",
+    icon: "ListCheckbox",
     prompt: `基于以下资料，生成一份结构化的大纲摘要。包含：
 1. 主题概述（1-2 段）
 2. 核心要点（层级结构）
@@ -33,7 +33,7 @@ const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string
   },
   timeline: {
     label: "时间线",
-    icon: "📅",
+    icon: "Timeline",
     prompt: `基于以下资料，提取并整理出一条时间线。
 按时间顺序列出关键事件、发展阶段或里程碑。
 如果资料中没有明确的时间信息，则按逻辑发展顺序整理。
@@ -41,7 +41,7 @@ const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string
   },
   concepts: {
     label: "关键概念",
-    icon: "🎯",
+    icon: "Concept",
     prompt: `基于以下资料，提取 10-20 个关键概念/术语。
 每个概念包含：
 1. **概念名称**
@@ -51,7 +51,7 @@ const STUDIO_TYPES: Record<string, { label: string; icon: string; prompt: string
   },
   briefing: {
     label: "简报文档",
-    icon: "📝",
+    icon: "DocDetail",
     prompt: `基于以下资料，生成一份简报文档（Briefing Document）。包含：
 1. 背景概述
 2. 核心发现/观点（3-5 个要点）

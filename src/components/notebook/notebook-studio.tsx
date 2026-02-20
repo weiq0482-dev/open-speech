@@ -6,11 +6,35 @@ import { Loader2, RefreshCw, ChevronDown, ChevronRight, Mic, Play, Pause, Volume
 import { VideoGenerator } from "@/components/video/video-generator";
 import { IconMagicWand } from "@/components/app-icons";
 import { cn } from "@/lib/utils";
+import {
+  Notebook,
+  Help,
+  ListCheckbox,
+  Calendar,
+  MindmapList,
+  DocDetail,
+} from "@icon-park/react";
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
+
+const STUDIO_ICON_MAP: Record<string, React.ReactNode> = {
+  Notebook: <Notebook size={18} theme="outline" strokeWidth={3} />,
+  HelpCircle: <Help size={18} theme="outline" strokeWidth={3} />,
+  ListCheckbox: <ListCheckbox size={18} theme="outline" strokeWidth={3} />,
+  Timeline: <Calendar size={18} theme="outline" strokeWidth={3} />,
+  Concept: <MindmapList size={18} theme="outline" strokeWidth={3} />,
+  DocDetail: <DocDetail size={18} theme="outline" strokeWidth={3} />,
+};
+
+function StudioIcon({ name }: { name: string }) {
+  const icon = STUDIO_ICON_MAP[name];
+  if (icon) return <span className="text-[var(--muted)] opacity-70">{icon}</span>;
+  return <span className="text-base">{name}</span>;
+}
 
 export function NotebookStudio({
   notebookId,
@@ -89,7 +113,7 @@ export function NotebookStudio({
                 >
                   {/* 类型头部 */}
                   <div className="flex items-center gap-2 px-3 py-2.5">
-                    <span className="text-base">{st.icon}</span>
+                    <StudioIcon name={st.icon} />
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-medium">{st.label}</p>
                       {output && (

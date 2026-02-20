@@ -321,7 +321,13 @@ function GeneratedImages({
   );
 }
 
+function preprocessContent(content: string): string {
+  // 将 <br>、<br/>、<br /> 等 HTML 换行标签转换为 Markdown 换行（两个空格+换行）
+  return content.replace(/<br\s*\/?>/gi, "  \n");
+}
+
 function MarkdownContent({ content }: { content: string }) {
+  const processed = preprocessContent(content);
   return (
     <div className="markdown-body text-sm">
       <ReactMarkdown
@@ -346,7 +352,7 @@ function MarkdownContent({ content }: { content: string }) {
           },
         }}
       >
-        {content}
+        {processed}
       </ReactMarkdown>
     </div>
   );
