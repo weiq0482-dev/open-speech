@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useNotebookStore } from "@/store/notebook-store";
-import { Loader2, RefreshCw, ChevronDown, ChevronRight, Mic, Play, Pause, Volume2 } from "lucide-react";
+import { Loader2, RefreshCw, ChevronDown, ChevronRight, Mic, Play, Pause, Volume2, Video } from "lucide-react";
+import { VideoGenerator } from "@/components/video/video-generator";
 import { IconMagicWand } from "@/components/app-icons";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
@@ -34,6 +35,7 @@ export function NotebookStudio({
 
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [showPodcast, setShowPodcast] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   const enabledSources = sources.filter((s) => s.enabled);
 
   useEffect(() => {
@@ -200,6 +202,38 @@ export function NotebookStudio({
                   <p className="text-[9px] text-[var(--muted)]">
                     {podcastData ? `${podcastData.mode === "dialogue" ? "对话模式" : "朗读模式"} · ${new Date(podcastData.generatedAt).toLocaleDateString("zh-CN")}` : "朗读模式 / 对话模式"}
                   </p>
+                </div>
+                <ChevronRight size={12} className="text-[var(--muted)]" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* 视频生成区域 */}
+        {enabledSources.length > 0 && (
+          <div className="mt-3 border-t border-[var(--border)] pt-3">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Video size={14} className="text-purple-500" />
+              <h4 className="text-xs font-semibold text-[var(--muted)] uppercase tracking-wider">
+                AI 视频
+              </h4>
+            </div>
+
+            {showVideo ? (
+              <VideoGenerator
+                notebookId={notebookId}
+                userId={userId}
+                onClose={() => setShowVideo(false)}
+              />
+            ) : (
+              <button
+                onClick={() => setShowVideo(true)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg border border-[var(--border)] hover:border-purple-300 dark:hover:border-purple-700 hover:bg-purple-50/30 dark:hover:bg-purple-900/10 transition-all"
+              >
+                <Video size={14} className="text-purple-500" />
+                <div className="flex-1 text-left">
+                  <p className="text-[11px] font-medium">生成视频</p>
+                  <p className="text-[9px] text-[var(--muted)]">知识卡片 / 数字人口播 / 混合剪辑</p>
                 </div>
                 <ChevronRight size={12} className="text-[var(--muted)]" />
               </button>
