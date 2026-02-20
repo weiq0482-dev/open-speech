@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getRedis, isValidUserId, NB_PREFIX, NB_PODCAST, collectSourceTexts, callAI } from "@/lib/notebook-utils";
+import { synthesizeSpeech, isCosyVoiceAvailable } from "@/lib/cosyvoice-tts";
 
-// Edge TTS 中文声音
+// Edge TTS 中文声音（Web Speech API 兜底用）
 const VOICES = {
   male1: "zh-CN-YunxiNeural",       // 男声（年轻）
   male2: "zh-CN-YunjianNeural",     // 男声（沉稳）
@@ -85,7 +86,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // 解析对话脚本为结构化数据
-    let segments: { speaker: string; text: string; voice: string }[] = [];
+    let segments: { speaker: string; text: string; voice: string; audioUrl?: string; duration?: number }[] = [];
 
     if (podcastMode === "dialogue") {
       const lines = script.split("\n").filter((l: string) => l.trim());
@@ -114,12 +115,36 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       segments = [{ speaker: "Narrator", text: script, voice: voice || VOICES.female1 }];
     }
 
+    // 尝试用 CosyVoice 生成真实音频
+    let ttsAvailable = false;
+    try {
+      ttsAvailable = isCosyVoiceAvailable();
+    } catch {}
+
+    if (ttsAvailable && segments.length > 0) {
+      // 每段最多 500 字，避免超时；超长段落截断
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const text = seg.text.slice(0, 500);
+        try {
+          const result = await synthesizeSpeech({
+            text,
+            voice: seg.voice.startsWith("zh-CN") ? (voice || "longxiaochun") : seg.voice,
+          });
+          segments[i] = { ...seg, audioUrl: result.audioUrl, duration: result.duration };
+        } catch (err) {
+          console.warn(`[Podcast TTS] segment ${i} failed:`, err);
+        }
+      }
+    }
+
     // 保存播客数据（按模式分开存储，避免互相覆盖）
     const podcast = {
       mode: podcastMode,
       script,
       segments,
       voices: VOICES,
+      ttsGenerated: ttsAvailable,
       generatedAt: new Date().toISOString(),
     };
     await redis.set(`${NB_PODCAST}${notebookId}:${podcastMode}`, podcast);

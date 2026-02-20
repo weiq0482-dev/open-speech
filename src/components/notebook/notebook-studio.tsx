@@ -309,6 +309,7 @@ function PodcastPanel({
   const [playing, setPlaying] = useState(false);
   const [currentSegment, setCurrentSegment] = useState(0);
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   // 加载用户数字人声音配置
   const [digitalHumanVoices, setDigitalHumanVoices] = useState<DigitalHumanVoice[]>([]);
@@ -339,6 +340,7 @@ function PodcastPanel({
 
     if (playing) {
       window.speechSynthesis.cancel();
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
       setPlaying(false);
       return;
     }
@@ -355,18 +357,27 @@ function PodcastPanel({
     }
 
     setCurrentSegment(index);
-    const seg = podcastData.segments[index];
+    const seg = podcastData.segments[index] as { speaker: string; text: string; voice: string; audioUrl?: string };
+
+    // 优先用 CosyVoice 生成的真实音频
+    if (seg.audioUrl) {
+      const audio = new Audio(seg.audioUrl);
+      audioRef.current = audio;
+      audio.onended = () => playSegment(index + 1);
+      audio.onerror = () => playSegment(index + 1);
+      audio.play().catch(() => playSegment(index + 1));
+      return;
+    }
+
+    // 降级：Web Speech API
     const utterance = new SpeechSynthesisUtterance(seg.text);
     utterance.lang = "zh-CN";
-    utterance.rate = 0.9;  // 稍慢更自然
+    utterance.rate = 0.9;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
-
-    // 尝试选择更自然的中文声音
     const voices = window.speechSynthesis.getVoices();
     const zhVoices = voices.filter((v) => v.lang.startsWith("zh"));
     if (zhVoices.length > 0) {
-      // 对话模式：Host 用第一个声音，Guest 用第二个（如有）
       if (seg.speaker === "Guest" && zhVoices.length > 1) {
         utterance.voice = zhVoices[1];
         utterance.pitch = 0.95;
@@ -375,14 +386,8 @@ function PodcastPanel({
         utterance.pitch = 1.05;
       }
     }
-
-    utterance.onend = () => {
-      playSegment(index + 1);
-    };
-    utterance.onerror = () => {
-      setPlaying(false);
-    };
-
+    utterance.onend = () => playSegment(index + 1);
+    utterance.onerror = () => setPlaying(false);
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
   };
@@ -390,6 +395,7 @@ function PodcastPanel({
   useEffect(() => {
     return () => {
       window.speechSynthesis.cancel();
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
     };
   }, []);
 
