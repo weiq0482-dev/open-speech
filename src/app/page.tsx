@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState } from "react";
-import { useChatStore, type Attachment } from "@/store/chat-store";
+import { useChatStore, type Attachment, type Gem } from "@/store/chat-store";
 import { Sidebar } from "@/components/sidebar";
 import { ChatInput } from "@/components/chat-input";
 import { ChatMessage } from "@/components/chat-message";
@@ -180,6 +180,32 @@ function ChatApp() {
       })
       .catch(() => {});
   }, [userId]);
+
+  // 从后端加载用户 config（generationConfig/activeMode/customSystemInstruction）和自定义 gems
+  useEffect(() => {
+    if (!userId) return;
+    Promise.all([
+      fetch(`/api/user-config?userId=${encodeURIComponent(userId)}`).then(r => r.json()).catch(() => ({ config: null })),
+      fetch(`/api/gems?userId=${encodeURIComponent(userId)}`).then(r => r.json()).catch(() => ({ gems: [] })),
+    ]).then(([configData, gemsData]) => {
+      // 用 setState 直接写入，不触发防抖保存（避免加载后立即回写）
+      if (configData.config) {
+        const patch: Record<string, unknown> = {};
+        if (configData.config.generationConfig) patch.generationConfig = configData.config.generationConfig;
+        if (configData.config.activeMode) patch.activeMode = configData.config.activeMode;
+        if (configData.config.customSystemInstruction !== undefined) patch.customSystemInstruction = configData.config.customSystemInstruction;
+        if (Object.keys(patch).length > 0) useChatStore.setState(patch as Parameters<typeof useChatStore.setState>[0]);
+      }
+      if (gemsData.gems?.length > 0) {
+        const existing = useChatStore.getState().gems;
+        const existingCustomIds = new Set(existing.filter((g: {isBuiltin?: boolean}) => !g.isBuiltin).map((g: {id: string}) => g.id));
+        const newGems = (gemsData.gems as Gem[]).filter(g => !existingCustomIds.has(g.id)).map(g => ({ ...g, isBuiltin: false as const }));
+        if (newGems.length > 0) {
+          useChatStore.setState(state => ({ gems: [...state.gems, ...newGems] }));
+        }
+      }
+    });
+  }, [userId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleDismissAd = (permanent: boolean) => {
     setShowAdBanner(false);

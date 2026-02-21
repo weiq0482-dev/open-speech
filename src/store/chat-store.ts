@@ -2,6 +2,30 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { generateId } from "@/lib/utils";
 
+// ========== 防抖后端保存工具 ==========
+function debounce<T extends (...args: Parameters<T>) => void>(fn: T, ms: number): T {
+  let timer: ReturnType<typeof setTimeout>;
+  return ((...args: Parameters<T>) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); }) as T;
+}
+
+const _saveConfig = debounce((userId: string, generationConfig: object, activeMode: string, customSystemInstruction: string) => {
+  if (!userId || typeof window === "undefined") return;
+  fetch("/api/user-config", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, generationConfig, activeMode, customSystemInstruction }),
+  }).catch(() => {});
+}, 1500);
+
+const _saveGems = debounce((userId: string, gems: object[]) => {
+  if (!userId || typeof window === "undefined") return;
+  fetch("/api/gems", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ userId, gems }),
+  }).catch(() => {});
+}, 1000);
+
 export type MessageRole = "user" | "assistant";
 
 export interface Attachment {
@@ -370,6 +394,8 @@ export const useChatStore = create<ChatState>()(
     const id = generateId();
     const newGem: Gem = { ...gem, id, isBuiltin: false };
     set((state) => ({ gems: [...state.gems, newGem] }));
+    const { userId, gems } = get();
+    _saveGems(userId, gems.filter((g) => !g.isBuiltin));
     return id;
   },
 
@@ -377,24 +403,36 @@ export const useChatStore = create<ChatState>()(
     set((state) => ({
       gems: state.gems.filter((g) => g.id !== id || g.isBuiltin),
     }));
+    const { userId, gems } = get();
+    _saveGems(userId, gems.filter((g) => !g.isBuiltin));
   },
 
   setActiveGem: (id) => set({ activeGemId: id }),
 
   getGemById: (id) => get().gems.find((g) => g.id === id),
 
-  setGenerationConfig: (config) =>
-    set((state) => ({
-      generationConfig: { ...state.generationConfig, ...config },
-    })),
-  setActiveMode: (mode) =>
-    set({ activeMode: mode, generationConfig: { ...MODE_CONFIGS[mode].config } }),
-  setCustomSystemInstruction: (instruction) =>
-    set({ customSystemInstruction: instruction }),
+  setGenerationConfig: (config) => {
+    set((state) => ({ generationConfig: { ...state.generationConfig, ...config } }));
+    const { userId, generationConfig, activeMode, customSystemInstruction } = get();
+    _saveConfig(userId, { ...generationConfig, ...config }, activeMode, customSystemInstruction);
+  },
+  setActiveMode: (mode) => {
+    set({ activeMode: mode, generationConfig: { ...MODE_CONFIGS[mode].config } });
+    const { userId, customSystemInstruction } = get();
+    _saveConfig(userId, { ...MODE_CONFIGS[mode].config }, mode, customSystemInstruction);
+  },
+  setCustomSystemInstruction: (instruction) => {
+    set({ customSystemInstruction: instruction });
+    const { userId, generationConfig, activeMode } = get();
+    _saveConfig(userId, generationConfig, activeMode, instruction);
+  },
   toggleSettingsPanel: () =>
     set((state) => ({ settingsPanelOpen: !state.settingsPanelOpen })),
-  resetGenerationConfig: () =>
-    set({ generationConfig: { ...DEFAULT_CONFIG }, customSystemInstruction: "" }),
+  resetGenerationConfig: () => {
+    set({ generationConfig: { ...DEFAULT_CONFIG }, customSystemInstruction: "" });
+    const { userId, activeMode } = get();
+    _saveConfig(userId, { ...DEFAULT_CONFIG }, activeMode, "");
+  },
   setUserApiKey: (key) => set({ userApiKey: key }),
   setUserApiBase: (base) => set({ userApiBase: base }),
   setUserId: (id) => set({ userId: id }),
