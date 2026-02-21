@@ -884,6 +884,31 @@ function SettingsTab({ session }: { session: AdminSession }) {
   const [referralMaxBonus, setReferralMaxBonus] = useState(5500);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
+
+  // 图片上传辅助：上传到服务器 /public 目录，返回路径
+  const uploadImage = async (file: File, saveName: string, setter: (url: string) => void) => {
+    setUploading(saveName);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      fd.append("filename", saveName);
+      const resp = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "x-admin-key": session.adminKey },
+        body: fd,
+      });
+      const data = await resp.json();
+      if (resp.ok && data.url) {
+        setter(data.url);
+      } else {
+        alert(data.error || "上传失败");
+      }
+    } catch {
+      alert("上传失败，请检查网络");
+    }
+    setUploading(null);
+  };
 
   useEffect(() => {
     adminFetch("/api/admin/settings", session).then((r) => r.json()).then((d) => {
@@ -1041,8 +1066,14 @@ function SettingsTab({ session }: { session: AdminSession }) {
               className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
             <input placeholder="副标题" value={douyinDesc} onChange={e => setDouyinDesc(e.target.value)}
               className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
-            <input placeholder="图片URL（/douyin-qr.png）" value={douyinQrUrl} onChange={e => setDouyinQrUrl(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+            <div className="flex items-center gap-2">
+              {douyinQrUrl && <img src={douyinQrUrl} alt="预览" className="w-10 h-10 rounded-lg object-cover border border-gray-200" onError={e => (e.target as HTMLImageElement).style.display="none"} />}
+              <label className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-dashed border-blue-300 text-xs text-blue-500 cursor-pointer hover:bg-blue-50 transition-colors ${uploading==="douyin-qr" ? "opacity-50" : ""}`}>
+                {uploading==="douyin-qr" ? "上传中..." : "📷 上传二维码"}
+                <input type="file" accept="image/*" className="hidden" disabled={!!uploading}
+                  onChange={e => { const f=e.target.files?.[0]; if(f) uploadImage(f, "douyin-qr", setDouyinQrUrl); e.target.value=""; }} />
+              </label>
+            </div>
           </div>
           <div className="space-y-2 border border-gray-100 rounded-xl p-3">
             <p className="text-xs font-medium text-gray-600">右侧广告（微信）</p>
@@ -1050,8 +1081,14 @@ function SettingsTab({ session }: { session: AdminSession }) {
               className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
             <input placeholder="副标题" value={wechatDesc} onChange={e => setWechatDesc(e.target.value)}
               className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
-            <input placeholder="图片URL（/wechat-qr.png）" value={wechatQrUrl} onChange={e => setWechatQrUrl(e.target.value)}
-              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+            <div className="flex items-center gap-2">
+              {wechatQrUrl && <img src={wechatQrUrl} alt="预览" className="w-10 h-10 rounded-lg object-cover border border-gray-200" onError={e => (e.target as HTMLImageElement).style.display="none"} />}
+              <label className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg border border-dashed border-green-300 text-xs text-green-600 cursor-pointer hover:bg-green-50 transition-colors ${uploading==="wechat-qr" ? "opacity-50" : ""}`}>
+                {uploading==="wechat-qr" ? "上传中..." : "📷 上传二维码"}
+                <input type="file" accept="image/*" className="hidden" disabled={!!uploading}
+                  onChange={e => { const f=e.target.files?.[0]; if(f) uploadImage(f, "wechat-qr", setWechatQrUrl); e.target.value=""; }} />
+              </label>
+            </div>
           </div>
         </div>
         <div>
@@ -1075,8 +1112,14 @@ function SettingsTab({ session }: { session: AdminSession }) {
           className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
         <textarea placeholder="广告内容描述文字" value={adBannerContent} onChange={e => setAdBannerContent(e.target.value)} rows={2}
           className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500 resize-none" />
-        <input placeholder="广告图片URL（建议 750×200px）" value={adBannerImageUrl} onChange={e => setAdBannerImageUrl(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+        <div className="space-y-1.5">
+          {adBannerImageUrl && <img src={adBannerImageUrl} alt="广告预览" className="w-full max-h-24 object-cover rounded-lg border border-gray-200" onError={e => (e.target as HTMLImageElement).style.display="none"} />}
+          <label className={`flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg border-2 border-dashed border-blue-300 text-sm text-blue-500 cursor-pointer hover:bg-blue-50 transition-colors ${uploading==="ad-banner" ? "opacity-50" : ""}`}>
+            {uploading==="ad-banner" ? "上传中..." : "📷 上传广告图片（建议 750×200px）"}
+            <input type="file" accept="image/*" className="hidden" disabled={!!uploading}
+              onChange={e => { const f=e.target.files?.[0]; if(f) uploadImage(f, "ad-banner", setAdBannerImageUrl); e.target.value=""; }} />
+          </label>
+        </div>
         <div className="grid grid-cols-2 gap-2">
           <input placeholder="链接地址 https://..." value={adBannerLinkUrl} onChange={e => setAdBannerLinkUrl(e.target.value)}
             className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
