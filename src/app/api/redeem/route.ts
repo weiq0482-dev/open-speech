@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Redis } from "@upstash/redis";
-import { redeemCoupon, getUserQuota, isCouponCode, getSystemSettingsPublic } from "@/lib/quota-store";
+import { redeemCoupon, getUserQuota, isCouponCode, getSystemSettingsPublic, getPlans } from "@/lib/quota-store";
 
 // 频率限制：同一 IP 每小时最多 10 次兑换尝试
 const RATE_LIMIT = 10;
@@ -71,11 +71,12 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "缺少 userId" }, { status: 400 });
     }
 
-    const [quota, settings] = await Promise.all([
+    const [quota, settings, plans] = await Promise.all([
       getUserQuota(userId),
       getSystemSettingsPublic(),
+      getPlans(),
     ]);
-    return NextResponse.json({ quota: { ...quota, freeDailyLimit: settings.freeDailyLimit, freeTrialDays: settings.freeTrialDays, modelProvider: settings.modelProvider } });
+    return NextResponse.json({ quota: { ...quota, freeDailyLimit: settings.freeDailyLimit, freeTrialDays: settings.freeTrialDays, modelProvider: settings.modelProvider }, plans });
   } catch (err) {
     console.error("[GET /api/redeem]", err);
     return NextResponse.json({ error: "服务器错误" }, { status: 500 });

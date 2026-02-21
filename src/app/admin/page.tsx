@@ -846,6 +846,11 @@ function SettingsTab({ session }: { session: AdminSession }) {
   const [qwenApiKey, setQwenApiKey] = useState("");
   const [geminiApiKey, setGeminiApiKey] = useState("");
   const [videoRetentionDays, setVideoRetentionDays] = useState(90);
+  const [epayApiUrl, setEpayApiUrl] = useState("");
+  const [epayPid, setEpayPid] = useState("");
+  const [epayKey, setEpayKey] = useState("");
+  const [epayNotifyUrl, setEpayNotifyUrl] = useState("");
+  const [epayReturnUrl, setEpayReturnUrl] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -869,7 +874,14 @@ function SettingsTab({ session }: { session: AdminSession }) {
       }
     }).catch(() => {});
     adminFetch("/api/admin/site-config", session).then((r) => r.json()).then((d) => {
-      if (d.config) setVideoRetentionDays(d.config.videoRetentionDays || 90);
+      if (d.config) {
+        setVideoRetentionDays(d.config.videoRetentionDays || 90);
+        setEpayApiUrl(d.config.epayApiUrl || "");
+        setEpayPid(d.config.epayPid || "");
+        setEpayKey(d.config.epayKey || "");
+        setEpayNotifyUrl(d.config.epayNotifyUrl || "");
+        setEpayReturnUrl(d.config.epayReturnUrl || "");
+      }
     }).catch(() => {});
     adminFetch("/api/admin/plans", session).then((r) => r.json()).then((d) => {
       if (d.plans) setPlans(d.plans);
@@ -885,7 +897,7 @@ function SettingsTab({ session }: { session: AdminSession }) {
       });
       await adminFetch("/api/admin/site-config", session, {
         method: "POST",
-        body: JSON.stringify({ videoRetentionDays }),
+        body: JSON.stringify({ videoRetentionDays, epayApiUrl, epayPid, epayKey, epayNotifyUrl, epayReturnUrl }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -1177,6 +1189,67 @@ function SettingsTab({ session }: { session: AdminSession }) {
           />
           <p className="text-xs text-gray-400 mt-1">用户生成的视频将在此天数后自动清理，默认 90 天</p>
         </div>
+      </div>
+
+      {/* 易支付配置 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div>
+          <h3 className="text-sm font-semibold">易支付配置</h3>
+          <p className="text-xs text-gray-400 mt-0.5">配置后用户可在前端扫码充值购买套餐</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">接口地址（API URL）</label>
+            <input
+              type="text"
+              value={epayApiUrl}
+              onChange={(e) => setEpayApiUrl(e.target.value)}
+              placeholder="https://your-epay.com"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">商户ID（PID）</label>
+            <input
+              type="text"
+              value={epayPid}
+              onChange={(e) => setEpayPid(e.target.value)}
+              placeholder="1001"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-gray-500 mb-1 block">商户密钥（KEY）</label>
+            <input
+              type="password"
+              value={epayKey}
+              onChange={(e) => setEpayKey(e.target.value)}
+              placeholder="商户密钥"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">异步回调地址（Notify URL）</label>
+            <input
+              type="text"
+              value={epayNotifyUrl}
+              onChange={(e) => setEpayNotifyUrl(e.target.value)}
+              placeholder="https://your-domain.com/api/payment/notify"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">同步跳转地址（Return URL）</label>
+            <input
+              type="text"
+              value={epayReturnUrl}
+              onChange={(e) => setEpayReturnUrl(e.target.value)}
+              placeholder="https://your-domain.com"
+              className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-400">💡 Notify URL 填写：<code className="bg-gray-100 px-1 rounded">https://你的域名/api/payment/notify</code></p>
       </div>
 
       <button

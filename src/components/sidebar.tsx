@@ -28,6 +28,7 @@ import {
 import { AuthDialog } from "./auth-dialog";
 import { NotebookList } from "./notebook/notebook-list";
 import { UserSettings } from "./user-settings";
+import { PaymentDialog } from "./payment-dialog";
 
 interface ContactMsg {
   id: string;
@@ -212,6 +213,7 @@ export function Sidebar() {
   const [showGems, setShowGems] = useState(false);
   const [showApiKeyInput, setShowApiKeyInput] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showPayment, setShowPayment] = useState(false);
   const [showContact, setShowContact] = useState(false);
   const [contactMsg, setContactMsg] = useState("");
   const [contactSending, setContactSending] = useState(false);
@@ -595,20 +597,31 @@ export function Sidebar() {
             <span>{darkMode ? "浅色模式" : "深色模式"}</span>
           </button>
 
-          {/* API Key / 兑换码 */}
-          <button
-            onClick={() => setShowApiKeyInput(!showApiKeyInput)}
-            className={cn(
-              "flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm",
-              userApiKey ? "text-green-600 dark:text-green-400" : "text-[var(--foreground)]"
+          {/* API Key / 兑换码 + 充值 */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowApiKeyInput(!showApiKeyInput)}
+              className={cn(
+                "flex items-center gap-3 flex-1 px-3 py-2.5 rounded-xl hover:bg-[var(--sidebar-hover)] transition-colors text-sm",
+                userApiKey ? "text-green-600 dark:text-green-400" : "text-[var(--foreground)]"
+              )}
+            >
+              <Gift size={18} />
+              <span>{quotaInfo?.modelProvider === "qwen" ? "兑换码" : "Key / 兑换码"}</span>
+              {userApiKey && quotaInfo?.modelProvider !== "qwen" && (
+                <span className="ml-auto text-[10px] text-green-600 dark:text-green-400">已配置</span>
+              )}
+            </button>
+            {userId && (
+              <button
+                onClick={() => setShowPayment(true)}
+                className="px-2.5 py-2 rounded-xl bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium transition-colors whitespace-nowrap flex items-center gap-1"
+              >
+                <Zap size={13} />
+                充值
+              </button>
             )}
-          >
-            <Gift size={18} />
-            <span>{quotaInfo?.modelProvider === "qwen" ? "兑换码" : "Key / 兑换码"}</span>
-            {userApiKey && quotaInfo?.modelProvider !== "qwen" && (
-              <span className="ml-auto text-[10px] text-green-600 dark:text-green-400">已配置</span>
-            )}
-          </button>
+          </div>
           {showApiKeyInput && (
             <div className="px-2 pb-2 animate-fade-in space-y-1.5">
               <div className="flex gap-1">
@@ -798,6 +811,19 @@ export function Sidebar() {
 
       {/* 用户设置弹窗 */}
       <UserSettings open={showUserSettings} onClose={() => setShowUserSettings(false)} />
+
+      {/* 充值弹窗 */}
+      {userId && (
+        <PaymentDialog
+          open={showPayment}
+          onClose={() => setShowPayment(false)}
+          userId={userId}
+          onSuccess={() => {
+            setShowPayment(false);
+            setTimeout(fetchQuota, 1000);
+          }}
+        />
+      )}
     </>
   );
 }
