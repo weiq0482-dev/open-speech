@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { Player } from "@remotion/player";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Player, type PlayerRef } from "@remotion/player";
 import { VideoComposition, calculateTotalFrames } from "./video-composition";
 import type { VideoScript } from "@/lib/video-script-generator";
 import type { ComplianceResult } from "@/lib/video-script-generator";
 import type { PublishSuggestion } from "@/lib/video-batch-publish";
 import { COSYVOICE_VOICES } from "@/lib/cosyvoice-tts";
 import { BGM_LIBRARY, BGM_CATEGORIES, recommendBGM, type BGMTrack, type BGMCategory } from "@/lib/video-bgm";
-import { downloadBlob, getExportConfig, type ExportProgress } from "@/lib/video-export";
+import { downloadBlob, exportViaMediaRecorder, type ExportProgress } from "@/lib/video-export";
 import {
   Video, Sparkles, ShieldCheck, Volume2, Download, Loader2,
   ChevronRight, ChevronLeft, AlertTriangle, CheckCircle2, Info,
@@ -92,6 +92,9 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
   const [compliance, setCompliance] = useState<ComplianceResult | null>(null);
   const [audioReady, setAudioReady] = useState(false);
 
+  // Player ref（用于导出时获取 canvas）
+  const playerRef = useRef<PlayerRef>(null);
+
   // 导出 & 发布
   const [exportProgress, setExportProgress] = useState<ExportProgress | null>(null);
   const [publishSuggestions, setPublishSuggestions] = useState<PublishSuggestion[]>([]);
@@ -174,21 +177,23 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
   // ========== 导出 ==========
   const handleExport = useCallback(async () => {
     if (!script) return;
-    setExportProgress({ phase: "preparing", progress: 0, message: "准备导出..." });
-    // 模拟导出进度（实际导出需要 canvas 录制）
-    const config = getExportConfig(ratios[0] || "9:16", "medium");
+    const container = playerRef.current?.getContainerNode();
+    const canvas = container?.querySelector("canvas") as HTMLCanvasElement | null;
+    if (!canvas) {
+      setExportProgress({ phase: "error", progress: 0, message: "找不到播放器画布，请先预览视频后再导出" });
+      return;
+    }
     const totalMs = script.totalDuration * 1000;
-    let pct = 0;
-    const timer = setInterval(() => {
-      pct += 2;
-      if (pct >= 100) {
-        clearInterval(timer);
-        setExportProgress({ phase: "done", progress: 100, message: "导出完成！请在预览播放器中右键保存视频。" });
-      } else {
-        setExportProgress({ phase: "rendering", progress: pct, message: `渲染中... ${pct}%（${config.width}x${config.height}）` });
-      }
-    }, totalMs / 50);
-  }, [script, ratios]);
+    try {
+      // 自动播放，让 MediaRecorder 录制整个视频
+      playerRef.current?.play();
+      const blob = await exportViaMediaRecorder(canvas, totalMs, (p) => setExportProgress(p));
+      const title = script.videoTitle?.replace(/[\s/\\:*?"<>|]/g, "_") || "video";
+      downloadBlob(blob, `${title}.webm`);
+    } catch (e) {
+      setExportProgress({ phase: "error", progress: 0, message: String(e) });
+    }
+  }, [script]);
 
   // ========== 发布建议 ==========
   const handlePublishSuggestions = useCallback(async () => {
@@ -744,6 +749,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
             <div className="flex justify-center">
               <div className="rounded-lg overflow-hidden shadow-lg border border-[var(--border)]">
                 <Player
+                  ref={playerRef}
                   component={VideoComposition as unknown as React.ComponentType<Record<string, unknown>>}
                   inputProps={{ script, ratio: ratios[0] || "9:16", colorTheme: theme, showSubtitles, watermarkText, subtitleStyle } as unknown as Record<string, unknown>}
                   durationInFrames={calculateTotalFrames(script)}
@@ -765,12 +771,17 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
             {exportProgress ? (
               <div className="p-2 rounded-lg bg-[var(--card)] border border-[var(--border)]">
                 <div className="flex items-center gap-2 mb-1">
-                  <Loader2 size={12} className={exportProgress.phase === "done" ? "" : "animate-spin"} />
+                  <Loader2 size={12} className={exportProgress.phase === "done" || exportProgress.phase === "error" ? "" : "animate-spin"} />
                   <span className="text-[10px]">{exportProgress.message}</span>
                 </div>
                 <div className="w-full h-1.5 bg-[var(--sidebar-hover)] rounded-full overflow-hidden">
-                  <div className="h-full bg-blue-500 rounded-full transition-all" style={{ width: `${exportProgress.progress}%` }} />
+                  <div className={`h-full rounded-full transition-all ${exportProgress.phase === "error" ? "bg-red-500" : "bg-blue-500"}`} style={{ width: `${exportProgress.progress}%` }} />
                 </div>
+                {(exportProgress.phase === "done" || exportProgress.phase === "error") && (
+                  <button onClick={() => setExportProgress(null)} className="mt-1.5 text-[10px] text-[var(--muted)] hover:text-[var(--fg)]">
+                    重新导出
+                  </button>
+                )}
               </div>
             ) : (
               <button
@@ -778,7 +789,7 @@ export function VideoGenerator({ notebookId, userId, onClose }: VideoGeneratorPr
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-blue-500 text-white text-xs font-medium hover:bg-blue-600"
               >
                 <Download size={12} />
-                导出视频
+                下载视频（.webm）
               </button>
             )}
 
