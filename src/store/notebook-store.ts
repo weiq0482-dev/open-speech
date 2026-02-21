@@ -414,15 +414,22 @@ export const useNotebookStore = create<NotebookStore>((set, get) => ({
         }));
         // 通知侧边栏刷新配额
         if (typeof window !== "undefined") window.dispatchEvent(new Event("chat-message-sent"));
-      } else if (resp.status === 429) {
+      } else {
         try {
           const errData = await resp.json();
-          alert(errData.error || "额度不足，请兑换体验卡或购买套餐");
+          if (resp.status === 429) {
+            alert(errData.error || "额度不足，请兑换体验卡或购买套餐");
+          } else {
+            alert(errData.error || "生成失败，请确认来源内容已启用后重试");
+          }
         } catch {
-          alert("额度不足，请兑换体验卡或购买套餐");
+          alert("生成失败，请重试");
         }
       }
-    } catch {}
+    } catch (e) {
+      console.error("[generateStudio]", e);
+      alert("生成失败，请检查网络后重试");
+    }
     set({ generatingStudio: null });
   },
 

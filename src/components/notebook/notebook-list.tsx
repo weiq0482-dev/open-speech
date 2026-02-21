@@ -117,24 +117,18 @@ export function NotebookList({
       .catch(() => {});
   }, [userId]);
 
-  // 自动创建模板知识库（首次打开时，或知识库为空时）
+  // 自动创建模板知识库（基于兴趣，缺哪个创哪个）
   useEffect(() => {
     if (loadingList || seedingRef.current || templates.length === 0) return;
-    const key = `nb_seeded_${userId}`;
-    // 知识库为空时无论如何都要重试；已有知识库时才信任 localStorage 标记
-    if (notebooks.length > 0 && localStorage.getItem(key)) return;
 
     const existingTitles = new Set(notebooks.map((nb) => nb.title));
     const toCreate = templates.filter((t) => !existingTitles.has(t.title));
 
-    if (toCreate.length === 0) {
-      localStorage.setItem(key, "1");
-      return;
-    }
+    // 所有模板已存在，无需创建
+    if (toCreate.length === 0) return;
 
     seedingRef.current = true;
     Promise.all(toCreate.map((tpl) => createNotebook(userId, tpl.title, tpl.icon)))
-      .then(() => localStorage.setItem(key, "1"))
       .catch(() => {});
   }, [loadingList, templates, notebooks, userId, createNotebook]);
 
