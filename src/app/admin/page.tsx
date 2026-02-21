@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MessageSquare, Users, Gift, Settings, Activity, Trash2, LogOut, Shield, UserPlus } from "lucide-react";
+import { MessageSquare, Users, Gift, Settings, Activity, Trash2, LogOut, Shield, UserPlus, Eye, EyeOff } from "lucide-react";
 
 // ========== 类型定义 ==========
 interface Message {
@@ -1084,9 +1084,11 @@ function AdminsTab({ session }: { session: AdminSession }) {
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newUsername, setNewUsername] = useState("");
-  const [newPassword, setNewPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("987654321");
+  const [showNewPwd, setShowNewPwd] = useState(false);
   const [newPerms, setNewPerms] = useState<string[]>(["coupons", "messages"]);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [resetMap, setResetMap] = useState<Record<string, { pwd: string; show: boolean }>>({});
 
   const PERM_OPTIONS = [
     { key: "messages", label: "客服消息" },
@@ -1127,7 +1129,7 @@ function AdminsTab({ session }: { session: AdminSession }) {
       if (resp.ok) {
         setMsg({ ok: true, text: data.message });
         setNewUsername("");
-        setNewPassword("");
+        setNewPassword("987654321");
         setShowCreate(false);
         fetchAdmins();
       } else {
@@ -1150,6 +1152,21 @@ function AdminsTab({ session }: { session: AdminSession }) {
 
   const togglePerm = (key: string) => {
     setNewPerms((prev) => prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]);
+  };
+
+  const handleResetPassword = async (username: string) => {
+    const entry = resetMap[username];
+    if (!entry?.pwd || entry.pwd.length < 4) return;
+    try {
+      const resp = await adminFetch("/api/admin/admins", session, {
+        method: "POST",
+        body: JSON.stringify({ action: "update", username, password: entry.pwd }),
+      });
+      const data = await resp.json();
+      setMsg({ ok: resp.ok, text: resp.ok ? `${username} 密码已重置` : data.error });
+      setResetMap(prev => { const n = { ...prev }; delete n[username]; return n; });
+    } catch { setMsg({ ok: false, text: "网络错误" }); }
+    setTimeout(() => setMsg(null), 3000);
   };
 
   if (loading) return <div className="text-center text-gray-400 py-20">加载中...</div>;
@@ -1179,16 +1196,25 @@ function AdminsTab({ session }: { session: AdminSession }) {
           <input
             value={newUsername}
             onChange={(e) => setNewUsername(e.target.value)}
-            placeholder="用户名（2-20位字母数字下划线）"
+            placeholder="用户名（支持中文，如：客服01）"
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
           />
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            placeholder="密码（至少4位）"
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
-          />
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">登录密码</label>
+            <div className="relative">
+              <input
+                type={showNewPwd ? "text" : "password"}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="密码（至少4位）"
+                className="w-full px-4 py-2.5 pr-10 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
+              />
+              <button type="button" onClick={() => setShowNewPwd(v => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showNewPwd ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+          </div>
           <div>
             <p className="text-xs text-gray-500 mb-2">权限：</p>
             <div className="flex flex-wrap gap-2">
@@ -1230,7 +1256,28 @@ function AdminsTab({ session }: { session: AdminSession }) {
           <tbody>
             {admins.map((a) => (
               <tr key={a.username} className="border-t border-gray-100 hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium">{a.username}</td>
+                <td className="px-4 py-3">
+                  <div className="font-medium text-sm">{a.username}</div>
+                  {resetMap[a.username] !== undefined ? (
+                    <div className="flex items-center gap-1 mt-1">
+                      <div className="relative">
+                        <input
+                          type={resetMap[a.username].show ? "text" : "password"}
+                          value={resetMap[a.username].pwd}
+                          onChange={e => setResetMap(prev => ({ ...prev, [a.username]: { ...prev[a.username], pwd: e.target.value } }))}
+                          placeholder="新密码"
+                          className="w-28 px-2 py-1 pr-7 rounded border border-gray-200 text-xs outline-none"
+                        />
+                        <button type="button" onClick={() => setResetMap(prev => ({ ...prev, [a.username]: { ...prev[a.username], show: !prev[a.username].show } }))}
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-gray-400">
+                          {resetMap[a.username].show ? <EyeOff size={12} /> : <Eye size={12} />}
+                        </button>
+                      </div>
+                      <button onClick={() => handleResetPassword(a.username)} className="text-xs text-blue-500 hover:underline">确认</button>
+                      <button onClick={() => setResetMap(prev => { const n={...prev}; delete n[a.username]; return n; })} className="text-xs text-gray-400 hover:underline">取消</button>
+                    </div>
+                  ) : null}
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
                     {a.permissions.map((p) => (
@@ -1242,7 +1289,13 @@ function AdminsTab({ session }: { session: AdminSession }) {
                 </td>
                 <td className="px-4 py-3 text-xs text-gray-500">{new Date(a.createdAt).toLocaleDateString("zh-CN")}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{a.lastLogin ? new Date(a.lastLogin).toLocaleString("zh-CN") : "-"}</td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3 space-x-3">
+                  <button
+                    onClick={() => setResetMap(prev => ({ ...prev, [a.username]: { pwd: "987654321", show: false } }))}
+                    className="text-xs text-blue-500 hover:underline"
+                  >
+                    重置密码
+                  </button>
                   <button
                     onClick={() => handleDelete(a.username)}
                     className="text-xs text-red-500 hover:underline"

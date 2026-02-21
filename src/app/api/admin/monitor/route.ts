@@ -21,21 +21,24 @@ export async function GET(req: NextRequest) {
     const today = new Date().toISOString().slice(0, 10);
 
     // 并行获取：账户列表、配额列表、历史日志
-    const [accountKeys, quotaKeys, logs] = await Promise.all([
+    const [accountKeys, logs] = await Promise.all([
       redis.keys("account:*").catch(() => [] as string[]),
-      redis.keys("quota:*").catch(() => [] as string[]),
       redis.lrange<{ userId: string; action: string; ip: string; time: string }>("monitor:logs", 0, 49).catch(() => []),
     ]);
 
     const totalVisits = accountKeys.length;
 
-    // 从配额 key 中采样判断今日活跃（最多取50个避免超时）
+    // 从 account 账户读取 userId，再查其 quota（准确，不含设备指纹）
     let todayVisits = 0;
     let activeUsers = 0;
-    if (quotaKeys.length > 0) {
-      const sampleKeys = quotaKeys.slice(0, 50);
+    if (accountKeys.length > 0) {
+      const sampleAccountKeys = accountKeys.slice(0, 50);
+      const accounts = await Promise.all(
+        sampleAccountKeys.map(k => redis.get<{ userId?: string }>(k).catch(() => null))
+      );
+      const userIds = accounts.map(a => a?.userId).filter(Boolean) as string[];
       const quotas = await Promise.all(
-        sampleKeys.map(k => redis.get<{ dailyFreeDate?: string; freeTrialStarted?: string }>(k).catch(() => null))
+        userIds.map(uid => redis.get<{ dailyFreeDate?: string; lastLogin?: string }>(`quota:${uid}`).catch(() => null))
       );
       const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
       quotas.forEach(q => {
@@ -43,9 +46,8 @@ export async function GET(req: NextRequest) {
         if (q.dailyFreeDate === today) todayVisits++;
         if (q.dailyFreeDate && q.dailyFreeDate >= sevenDaysAgo) activeUsers++;
       });
-      // 如果采样不够，按比例放大
-      if (quotaKeys.length > 50) {
-        const ratio = quotaKeys.length / 50;
+      if (accountKeys.length > 50) {
+        const ratio = accountKeys.length / 50;
         todayVisits = Math.round(todayVisits * ratio);
         activeUsers = Math.round(activeUsers * ratio);
       }

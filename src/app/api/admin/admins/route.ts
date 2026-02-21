@@ -27,18 +27,13 @@ export async function GET(req: NextRequest) {
   try {
     const redis = getRedis();
     const usernames = (await redis.get<string[]>(ALL_ADMINS_KEY)) || [];
-    const admins: Omit<AdminUser, "password">[] = [];
 
-    for (const username of usernames) {
-      try {
-        const data = await redis.get<AdminUser>(`${ADMIN_PREFIX}${username}`);
-        if (data) {
-          // 不返回密码
-          const { password, ...safe } = data;
-          admins.push(safe);
-        }
-      } catch { /* skip */ }
-    }
+    const results = await Promise.all(
+      usernames.map(u => redis.get<AdminUser>(`${ADMIN_PREFIX}${u}`).catch(() => null))
+    );
+    const admins = results
+      .filter((d): d is AdminUser => !!d)
+      .map(({ password: _pw, ...safe }) => safe);
 
     return NextResponse.json({ admins });
   } catch (err) {
@@ -59,8 +54,8 @@ export async function POST(req: NextRequest) {
     const redis = getRedis();
     const { action, username, password, permissions } = await req.json();
 
-    if (!username || !/^[a-zA-Z0-9_]{2,20}$/.test(username)) {
-      return NextResponse.json({ error: "用户名需 2-20 位字母数字下划线" }, { status: 400 });
+    if (!username || !username.trim()) {
+      return NextResponse.json({ error: "用户名不能为空" }, { status: 400 });
     }
 
     if (action === "create") {
