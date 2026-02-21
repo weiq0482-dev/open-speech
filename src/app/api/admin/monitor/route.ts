@@ -10,7 +10,7 @@ function checkAdmin(req: NextRequest): boolean {
   return false;
 }
 
-// GET: 获取访问监控数据
+// GET: 获取访问监控数据（动态计算 + 历史日志）
 export async function GET(req: NextRequest) {
   if (!checkAdmin(req)) {
     return NextResponse.json({ error: "未授权" }, { status: 401 });
@@ -18,17 +18,40 @@ export async function GET(req: NextRequest) {
 
   try {
     const redis = getRedis();
-    
-    // 获取统计数据
-    const stats = await redis.get<{ totalVisits: number; todayVisits: number; activeUsers: number }>("monitor:stats") || {
-      totalVisits: 0,
-      todayVisits: 0,
-      activeUsers: 0,
-    };
+    const today = new Date().toISOString().slice(0, 10);
 
-    // 获取最近访问日志
-    const logs = await redis.lrange<{ userId: string; action: string; ip: string; time: string }>("monitor:logs", 0, 49) || [];
+    // 并行获取：账户列表、配额列表、历史日志
+    const [accountKeys, quotaKeys, logs] = await Promise.all([
+      redis.keys("account:*").catch(() => [] as string[]),
+      redis.keys("quota:*").catch(() => [] as string[]),
+      redis.lrange<{ userId: string; action: string; ip: string; time: string }>("monitor:logs", 0, 49).catch(() => []),
+    ]);
 
+    const totalVisits = accountKeys.length;
+
+    // 从配额 key 中采样判断今日活跃（最多取50个避免超时）
+    let todayVisits = 0;
+    let activeUsers = 0;
+    if (quotaKeys.length > 0) {
+      const sampleKeys = quotaKeys.slice(0, 50);
+      const quotas = await Promise.all(
+        sampleKeys.map(k => redis.get<{ dailyFreeDate?: string; freeTrialStarted?: string }>(k).catch(() => null))
+      );
+      const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+      quotas.forEach(q => {
+        if (!q) return;
+        if (q.dailyFreeDate === today) todayVisits++;
+        if (q.dailyFreeDate && q.dailyFreeDate >= sevenDaysAgo) activeUsers++;
+      });
+      // 如果采样不够，按比例放大
+      if (quotaKeys.length > 50) {
+        const ratio = quotaKeys.length / 50;
+        todayVisits = Math.round(todayVisits * ratio);
+        activeUsers = Math.round(activeUsers * ratio);
+      }
+    }
+
+    const stats = { totalVisits, todayVisits, activeUsers };
     return NextResponse.json({ stats, logs });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });

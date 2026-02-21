@@ -56,15 +56,9 @@ export async function GET(req: NextRequest) {
     // 数据源 2: 邮箱账户索引（快速）
     const emailsFromIndex = (await redis.get<string[]>("all_accounts")) || [];
 
-    // 数据源 2b: 扫描 account:* 兜底（覆盖未写入索引的老用户）
-    let scanCursor = 0;
-    const scannedAccountKeys: string[] = [];
-    do {
-      const [nextCursor, keys] = await redis.scan(scanCursor, { match: `${ACCOUNT_PREFIX}*`, count: 100 });
-      scanCursor = parseInt(String(nextCursor));
-      scannedAccountKeys.push(...keys);
-    } while (scanCursor !== 0);
-    const scannedEmails = scannedAccountKeys.map(k => k.replace(ACCOUNT_PREFIX, ""));
+    // 数据源 2b: 单次调用 keys() 兼底未写入索引的老用户
+    const scannedAccountKeys = await redis.keys(`${ACCOUNT_PREFIX}*`).catch(() => [] as string[]);
+    const scannedEmails = scannedAccountKeys.map((k: string) => k.replace(ACCOUNT_PREFIX, ""));
     const allEmailsCombined = Array.from(new Set([...emailsFromIndex, ...scannedEmails]));
 
     // 数据源 3: 已使用兑换码的用户（限制数量）

@@ -32,14 +32,21 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "账户不存在" }, { status: 404 });
     }
 
-    // Backfill: 确保邮箱在 all_accounts 索引中（兼容旧用户）
-    try {
-      const redis = getRedis();
-      const allEmails = (await redis.get<string[]>("all_accounts")) || [];
-      if (!allEmails.includes(payload.email.toLowerCase().trim())) {
-        await redis.set("all_accounts", [...allEmails, payload.email.toLowerCase().trim()]);
-      }
-    } catch { /* backfill 失败不阻断正常流程 */ }
+    // Backfill + 访问日志（异步，不阻塞响应）
+    const redis = getRedis();
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    Promise.all([
+      // 确保邮箱在 all_accounts 索引中
+      redis.get<string[]>("all_accounts").then(allEmails => {
+        const list = allEmails || [];
+        if (!list.includes(payload.email.toLowerCase().trim())) {
+          return redis.set("all_accounts", [...list, payload.email.toLowerCase().trim()]);
+        }
+      }),
+      // 写访问日志（只保留最近1000条）
+      redis.lpush("monitor:logs", { userId: account.userId, action: "login", ip, time: new Date().toISOString() })
+        .then(() => redis.ltrim("monitor:logs", 0, 999)),
+    ]).catch(() => {});
 
     return NextResponse.json({
       userId: account.userId,
