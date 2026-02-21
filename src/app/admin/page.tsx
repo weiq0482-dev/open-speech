@@ -858,15 +858,6 @@ function SettingsTab({ session }: { session: AdminSession }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // 卡种管理
-  const [plans, setPlans] = useState<PlanOption[]>([]);
-  const [plansSaving, setPlansSaving] = useState(false);
-  const [plansSaved, setPlansSaved] = useState(false);
-  const [showAddPlan, setShowAddPlan] = useState(false);
-  const [newPlan, setNewPlan] = useState<PlanOption>({ id: "", label: "", chatQuota: 100, imageQuota: 20, durationDays: 30, dailyLimit: 20, rank: 1, color: "blue" });
-
-  const COLORS = ["blue", "amber", "purple", "green", "red", "pink", "indigo", "teal"];
-
   useEffect(() => {
     adminFetch("/api/admin/settings", session).then((r) => r.json()).then((d) => {
       if (d.settings) {
@@ -887,9 +878,6 @@ function SettingsTab({ session }: { session: AdminSession }) {
         setEpayReturnUrl(d.config.epayReturnUrl || "");
       }
     }).catch(() => {});
-    adminFetch("/api/admin/plans", session).then((r) => r.json()).then((d) => {
-      if (d.plans) setPlans(d.plans);
-    }).catch(() => {});
   }, [session]);
 
   const handleSaveSettings = async () => {
@@ -909,185 +897,9 @@ function SettingsTab({ session }: { session: AdminSession }) {
     setSaving(false);
   };
 
-  const handleSavePlans = async () => {
-    setPlansSaving(true);
-    try {
-      const resp = await adminFetch("/api/admin/plans", session, {
-        method: "POST",
-        body: JSON.stringify({ plans }),
-      });
-      if (resp.ok) {
-        setPlansSaved(true);
-        setTimeout(() => setPlansSaved(false), 2000);
-      }
-    } catch { /* ignore */ }
-    setPlansSaving(false);
-  };
-
-  const updatePlan = (idx: number, field: string, value: string | number) => {
-    setPlans(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
-  };
-
-  const removePlan = (idx: number) => {
-    if (plans.length <= 1) return;
-    setPlans(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  const addPlan = () => {
-    if (!newPlan.id || !newPlan.label) return;
-    if (plans.some(p => p.id === newPlan.id)) return;
-    setPlans(prev => [...prev, { ...newPlan }]);
-    setNewPlan({ id: "", label: "", chatQuota: 100, imageQuota: 20, durationDays: 30, dailyLimit: 20, rank: plans.length + 1, color: "blue" });
-    setShowAddPlan(false);
-  };
-
   return (
-    <div className="max-w-3xl space-y-4">
-      {/* 卡种管理 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-sm font-semibold">卡种管理</h3>
-            <p className="text-xs text-gray-400 mt-0.5">自定义套餐类型，每种卡独立配置额度和每日使用上限</p>
-          </div>
-          <button
-            onClick={() => setShowAddPlan(!showAddPlan)}
-            className="px-3 py-1.5 rounded-lg text-xs bg-blue-500 text-white hover:bg-blue-600"
-          >
-            + 新建卡种
-          </button>
-        </div>
-
-        {/* 新建卡种表单 */}
-        {showAddPlan && (
-          <div className="bg-blue-50 rounded-xl p-4 space-y-3 border border-blue-200">
-            <h4 className="text-xs font-semibold text-blue-700">新建卡种</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">卡种ID（英文）</label>
-                <input value={newPlan.id} onChange={(e) => setNewPlan(p => ({ ...p, id: e.target.value.replace(/[^a-z0-9_-]/g, "") }))}
-                  placeholder="例如: yearly" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">显示名称</label>
-                <input value={newPlan.label} onChange={(e) => setNewPlan(p => ({ ...p, label: e.target.value }))}
-                  placeholder="例如: 年卡（365天）" className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">对话次数</label>
-                <input type="number" value={newPlan.chatQuota} onChange={(e) => setNewPlan(p => ({ ...p, chatQuota: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">生图次数</label>
-                <input type="number" value={newPlan.imageQuota} onChange={(e) => setNewPlan(p => ({ ...p, imageQuota: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">有效天数</label>
-                <input type="number" value={newPlan.durationDays} onChange={(e) => setNewPlan(p => ({ ...p, durationDays: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">每日上限（次/天）</label>
-                <input type="number" value={newPlan.dailyLimit} onChange={(e) => setNewPlan(p => ({ ...p, dailyLimit: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">优先级（数字越大越高）</label>
-                <input type="number" value={newPlan.rank} onChange={(e) => setNewPlan(p => ({ ...p, rank: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none" />
-              </div>
-              <div>
-                <label className="text-[10px] text-gray-500 mb-0.5 block">徽章颜色</label>
-                <select value={newPlan.color} onChange={(e) => setNewPlan(p => ({ ...p, color: e.target.value }))}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none">
-                  {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={addPlan} disabled={!newPlan.id || !newPlan.label}
-                className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs hover:bg-blue-600 disabled:bg-gray-300">
-                添加
-              </button>
-              <button onClick={() => setShowAddPlan(false)} className="px-4 py-2 rounded-lg border border-gray-200 text-xs hover:bg-gray-50">
-                取消
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* 现有卡种列表 */}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
-                <th className="pb-2 pr-2">名称</th>
-                <th className="pb-2 pr-2">对话</th>
-                <th className="pb-2 pr-2">生图</th>
-                <th className="pb-2 pr-2">天数</th>
-                <th className="pb-2 pr-2">每日上限</th>
-                <th className="pb-2 pr-2">优先级</th>
-                <th className="pb-2 pr-2">颜色</th>
-                <th className="pb-2"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {plans.map((p, idx) => (
-                <tr key={p.id} className="border-b border-gray-50">
-                  <td className="py-2 pr-2">
-                    <input value={p.label} onChange={(e) => updatePlan(idx, "label", e.target.value)}
-                      className="w-full px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
-                    <span className="text-[10px] text-gray-400 ml-1">{p.id}</span>
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input type="number" value={p.chatQuota} onChange={(e) => updatePlan(idx, "chatQuota", Number(e.target.value))}
-                      className="w-16 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input type="number" value={p.imageQuota} onChange={(e) => updatePlan(idx, "imageQuota", Number(e.target.value))}
-                      className="w-16 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input type="number" value={p.durationDays} onChange={(e) => updatePlan(idx, "durationDays", Number(e.target.value))}
-                      className="w-16 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input type="number" value={p.dailyLimit} onChange={(e) => updatePlan(idx, "dailyLimit", Number(e.target.value))}
-                      className="w-16 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <input type="number" value={p.rank} onChange={(e) => updatePlan(idx, "rank", Number(e.target.value))}
-                      className="w-12 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
-                  </td>
-                  <td className="py-2 pr-2">
-                    <select value={p.color || "blue"} onChange={(e) => updatePlan(idx, "color", e.target.value)}
-                      className="px-2 py-1 rounded border border-gray-200 text-xs outline-none">
-                      {COLORS.map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                  </td>
-                  <td className="py-2">
-                    <button onClick={() => removePlan(idx)} disabled={plans.length <= 1}
-                      className="text-xs text-red-400 hover:text-red-600 disabled:text-gray-300" title="删除">
-                      删除
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <button
-          onClick={handleSavePlans}
-          disabled={plansSaving}
-          className="px-5 py-2 rounded-xl bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:bg-gray-300 transition-colors"
-        >
-          {plansSaving ? "保存中..." : plansSaved ? "卡种已保存 ✓" : "保存卡种配置"}
-        </button>
-      </div>
-
+    <div className="grid grid-cols-2 gap-4 max-w-5xl">
+      <div className="space-y-4">
       {/* 模型提供商配置 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
         <h3 className="text-sm font-semibold">AI 模型配置</h3>
@@ -1153,45 +965,34 @@ function SettingsTab({ session }: { session: AdminSession }) {
         )}
       </div>
 
+      </div>{/* 左栏结束 */}
+
+      <div className="space-y-4">
       {/* 免费用户配置 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
         <h3 className="text-sm font-semibold">免费用户配置</h3>
-
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">免费试用期（天）</label>
-          <input
-            type="number"
-            value={freeTrialDays}
-            onChange={(e) => setFreeTrialDays(Number(e.target.value))}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
-          />
-        </div>
-
-        <div>
-          <label className="text-xs text-gray-500 mb-1 block">每日免费额度（次）</label>
-          <input
-            type="number"
-            value={freeDailyLimit}
-            onChange={(e) => setFreeDailyLimit(Number(e.target.value))}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
-          />
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">免费试用期（天）</label>
+            <input type="number" value={freeTrialDays} onChange={(e) => setFreeTrialDays(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">每日免费额度（次）</label>
+            <input type="number" value={freeDailyLimit} onChange={(e) => setFreeDailyLimit(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          </div>
         </div>
       </div>
 
       {/* 视频设置 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
         <h3 className="text-sm font-semibold">视频设置</h3>
         <div>
           <label className="text-xs text-gray-500 mb-1 block">视频保留天数（天）</label>
-          <input
-            type="number"
-            min={1}
-            max={365}
-            value={videoRetentionDays}
-            onChange={(e) => setVideoRetentionDays(Number(e.target.value))}
-            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:border-blue-500"
-          />
-          <p className="text-xs text-gray-400 mt-1">用户生成的视频将在此天数后自动清理，默认 90 天</p>
+          <input type="number" min={1} max={365} value={videoRetentionDays} onChange={(e) => setVideoRetentionDays(Number(e.target.value))}
+            className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          <p className="text-xs text-gray-400 mt-1">默认 90 天，超期自动清理</p>
         </div>
       </div>
 
@@ -1263,6 +1064,7 @@ function SettingsTab({ session }: { session: AdminSession }) {
       >
         {saving ? "保存中..." : saved ? "已保存 ✓" : "保存系统设置"}
       </button>
+      </div>{/* 右栏结束 */}
     </div>
   );
 }

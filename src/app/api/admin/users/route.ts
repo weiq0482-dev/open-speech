@@ -55,7 +55,18 @@ export async function GET(req: NextRequest) {
 
     // 数据源 2: 邮箱账户索引（快速）
     const emailsFromIndex = (await redis.get<string[]>("all_accounts")) || [];
-    
+
+    // 数据源 2b: 扫描 account:* 兜底（覆盖未写入索引的老用户）
+    let scanCursor = 0;
+    const scannedAccountKeys: string[] = [];
+    do {
+      const [nextCursor, keys] = await redis.scan(scanCursor, { match: `${ACCOUNT_PREFIX}*`, count: 100 });
+      scanCursor = parseInt(String(nextCursor));
+      scannedAccountKeys.push(...keys);
+    } while (scanCursor !== 0);
+    const scannedEmails = scannedAccountKeys.map(k => k.replace(ACCOUNT_PREFIX, ""));
+    const allEmailsCombined = Array.from(new Set([...emailsFromIndex, ...scannedEmails]));
+
     // 数据源 3: 已使用兑换码的用户（限制数量）
     const allCoupons = (await redis.get<string[]>("all_coupons")) || [];
     const couponPromises = allCoupons.slice(0, 100).map(code => 
@@ -67,7 +78,7 @@ export async function GET(req: NextRequest) {
     });
 
     // ───── 第二步：批量获取邮箱账户信息 ─────
-    const accountPromises = emailsFromIndex.slice(0, 200).map(email =>
+    const accountPromises = allEmailsCombined.slice(0, 500).map(email =>
       redis.get<Record<string, unknown>>(`${ACCOUNT_PREFIX}${email}`).catch(() => null)
     );
     const accountResults = await Promise.all(accountPromises);
@@ -78,7 +89,7 @@ export async function GET(req: NextRequest) {
         const uid = account.userId as string;
         userIdsToFetch.add(uid);
         emailAccountMap.set(uid, {
-          email: emailsFromIndex[idx],
+          email: allEmailsCombined[idx],
           userId: uid,
           createdAt: account.createdAt as string | undefined,
           lastLogin: account.lastLogin as string | undefined,
