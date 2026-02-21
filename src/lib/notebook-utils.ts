@@ -48,10 +48,16 @@ export async function collectSourceTexts(redis: Redis, notebookId: string): Prom
   let totalLen = 0;
   const MAX_TOTAL = 200000;
 
-  for (const src of results) {
-    if (!src || typeof src !== "object") continue;
-    const s = src as { enabled?: boolean; title?: string; content?: string };
-    if (!s.enabled) continue;
+  for (const raw of results) {
+    if (!raw) continue;
+    // 兼容 pipeline 返回已解析对象或 JSON 字符串两种情况
+    let s: { enabled?: boolean; title?: string; content?: string } | null = null;
+    if (typeof raw === "string") {
+      try { s = JSON.parse(raw); } catch { continue; }
+    } else if (typeof raw === "object") {
+      s = raw as unknown as { enabled?: boolean; title?: string; content?: string };
+    }
+    if (!s || !s.enabled) continue;
     const chunk = `【来源: ${s.title || "未命名"}】\n${s.content || ""}`;
     if (totalLen + chunk.length > MAX_TOTAL) break;
     texts.push(chunk);

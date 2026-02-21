@@ -136,8 +136,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     // 收集来源文本
     const sourceTexts = await collectSourceTexts(redis, notebookId);
+    console.log(`[Studio] notebookId=${notebookId} sourceTexts.length=${sourceTexts.length}`);
     if (!sourceTexts) {
-      return NextResponse.json({ error: "没有可用的来源内容" }, { status: 400 });
+      return NextResponse.json({ error: "没有可用的来源内容，请确认左侧来源已启用（蓝色）" }, { status: 400 });
     }
 
     // 调用 AI 生成（自动适配 Gemini / 千问）
