@@ -23,6 +23,8 @@ export interface UserProfile {
   customInterests?: string;
   profession?: string;
   researchDirection?: string;
+  userName?: string;
+  avatar?: string;
   setupCompleted: boolean;
   createdAt: string;
   updatedAt: string;
@@ -53,7 +55,7 @@ export async function GET(req: NextRequest) {
 // POST: 保存用户兴趣和资料，用 AI 生成专家提示词
 export async function POST(req: NextRequest) {
   try {
-    const { userId, interests, customInterests, profession, researchDirection } = await req.json();
+    const { userId, interests, customInterests, profession, researchDirection, userName, avatar } = await req.json();
 
     if (!userId || !isValidUserId(userId)) {
       return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
@@ -75,6 +77,8 @@ export async function POST(req: NextRequest) {
       customInterests: hasCustom ? customInterests.trim().slice(0, 200) : undefined,
       profession: hasProfession ? profession.trim().slice(0, 50) : existing?.profession,
       researchDirection: researchDirection?.trim()?.slice(0, 100) || existing?.researchDirection,
+      userName: userName?.trim()?.slice(0, 50) || existing?.userName,
+      avatar: avatar || existing?.avatar,
       setupCompleted: true,
       createdAt: existing?.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),

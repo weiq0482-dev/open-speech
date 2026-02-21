@@ -141,6 +141,7 @@ function ChatApp() {
     userApiKey,
     userId,
     addGem,
+    setUserProfile,
   } = useChatStore();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -166,6 +167,15 @@ function ChatApp() {
         }
         if (data.plan && data.plan !== "free") {
           setIsPaidUser(true);
+        }
+        // 从后端同步 profile 到 store（跨设备持久化）
+        if (data.profile) {
+          const update: { userName?: string; userInterests?: string[]; userProfession?: string; userAvatar?: string } = {};
+          if (data.profile.interests?.length > 0) update.userInterests = data.profile.interests;
+          if (data.profile.profession) update.userProfession = data.profile.profession;
+          if (data.profile.userName) update.userName = data.profile.userName;
+          if (data.profile.avatar) update.userAvatar = data.profile.avatar;
+          if (Object.keys(update).length > 0) setUserProfile(update);
         }
       })
       .catch(() => {});
