@@ -52,7 +52,7 @@ interface AdminSession {
   adminKey: string; // 用于 API 鉴权
 }
 
-type TabKey = "messages" | "users" | "coupons" | "orders" | "settings" | "trash" | "admins" | "monitor";
+type TabKey = "messages" | "users" | "coupons" | "plans" | "orders" | "settings" | "trash" | "admins" | "monitor";
 
 // ========== 工具函数 ==========
 function adminFetch(url: string, session: AdminSession, options?: RequestInit) {
@@ -252,6 +252,7 @@ export default function AdminPage() {
     { key: "messages", label: "客服消息", perm: "messages", icon: <MessageSquare size={16} /> },
     { key: "users", label: "用户管理", perm: "users", icon: <Users size={16} /> },
     { key: "coupons", label: "兑换码", perm: "coupons", icon: <Gift size={16} /> },
+    { key: "plans", label: "套餐管理", perm: "coupons", icon: <Gift size={16} /> },
     { key: "orders", label: "订单管理", perm: "coupons", icon: <UserPlus size={16} /> },
     { key: "settings", label: "系统设置", perm: "settings", icon: <Settings size={16} /> },
     { key: "trash", label: "回收站", perm: "trash", icon: <Trash2 size={16} /> },
@@ -300,6 +301,7 @@ export default function AdminPage() {
         {activeTab === "settings" && <SettingsTab session={session} />}
         {activeTab === "trash" && <TrashTab session={session} />}
         {activeTab === "admins" && <AdminsTab session={session} />}
+        {activeTab === "plans" && <PlansTab session={session} />}
         {activeTab === "orders" && <OrdersTab session={session} />}
         {activeTab === "monitor" && <MonitorTab session={session} />}
       </div>
@@ -628,7 +630,7 @@ function UsersTab({ session }: { session: AdminSession }) {
 }
 
 // ========== 兑换码 Tab ==========
-interface PlanOption { id: string; label: string; chatQuota: number; imageQuota: number; durationDays: number; dailyLimit: number; rank: number; color?: string }
+interface PlanOption { id: string; label: string; chatQuota: number; imageQuota: number; durationDays: number; dailyLimit: number; rank: number; color?: string; price?: number }
 
 function CouponsTab({ session }: { session: AdminSession }) {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -1530,6 +1532,163 @@ function MonitorTab({ session }: { session: AdminSession }) {
         {recentLogs.length === 0 && (
           <p className="text-center text-gray-400 text-sm py-8">暂无访问记录</p>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ========== 套餐管理 Tab ==========
+const PLAN_COLORS = ["blue", "amber", "purple", "green", "red", "pink", "indigo", "teal"];
+
+function PlansTab({ session }: { session: AdminSession }) {
+  const [plans, setPlans] = useState<PlanOption[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newPlan, setNewPlan] = useState<PlanOption>({ id: "", label: "", chatQuota: 100, imageQuota: 20, durationDays: 30, dailyLimit: 20, rank: 1, color: "blue", price: 9.9 });
+
+  const fetchPlans = useCallback(async () => {
+    const resp = await adminFetch("/api/admin/plans", session);
+    if (resp.ok) { const d = await resp.json(); setPlans(d.plans || []); }
+  }, [session]);
+
+  useEffect(() => { fetchPlans(); }, [fetchPlans]);
+
+  const update = (idx: number, field: string, value: string | number) =>
+    setPlans(prev => prev.map((p, i) => i === idx ? { ...p, [field]: value } : p));
+
+  const remove = (idx: number) => {
+    if (plans.length <= 1) return;
+    setPlans(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const add = () => {
+    if (!newPlan.id || !newPlan.label) return;
+    if (plans.some(p => p.id === newPlan.id)) { alert("套餐ID已存在"); return; }
+    setPlans(prev => [...prev, { ...newPlan }]);
+    setNewPlan({ id: "", label: "", chatQuota: 100, imageQuota: 20, durationDays: 30, dailyLimit: 20, rank: plans.length + 1, color: "blue", price: 9.9 });
+    setShowAdd(false);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    const resp = await adminFetch("/api/admin/plans", session, { method: "POST", body: JSON.stringify({ plans }) });
+    if (resp.ok) { setSaved(true); setTimeout(() => setSaved(false), 2000); }
+    setSaving(false);
+  };
+
+  return (
+    <div className="max-w-4xl space-y-4">
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold">套餐管理</h3>
+            <p className="text-xs text-gray-400 mt-0.5">配置充值套餐的额度、价格和有效期，前端充值弹窗将读取此配置</p>
+          </div>
+          <button onClick={() => setShowAdd(!showAdd)} className="px-3 py-1.5 rounded-lg text-xs bg-blue-500 text-white hover:bg-blue-600">
+            + 新增套餐
+          </button>
+        </div>
+
+        {/* 新增表单 */}
+        {showAdd && (
+          <div className="bg-blue-50 rounded-xl p-4 space-y-3 border border-blue-200">
+            <h4 className="text-xs font-semibold text-blue-700">新增套餐</h4>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "套餐ID（英文）", field: "id", type: "text", placeholder: "如 yearly" },
+                { label: "显示名称", field: "label", type: "text", placeholder: "如 年卡（365天）" },
+                { label: "价格（元）", field: "price", type: "number", placeholder: "199.9" },
+                { label: "对话次数", field: "chatQuota", type: "number", placeholder: "1000" },
+                { label: "生图次数", field: "imageQuota", type: "number", placeholder: "100" },
+                { label: "有效天数", field: "durationDays", type: "number", placeholder: "365" },
+                { label: "每日上限", field: "dailyLimit", type: "number", placeholder: "50" },
+                { label: "优先级", field: "rank", type: "number", placeholder: "4" },
+              ].map(({ label, field, type, placeholder }) => (
+                <div key={field}>
+                  <label className="text-[10px] text-gray-500 mb-0.5 block">{label}</label>
+                  <input type={type} placeholder={placeholder}
+                    value={(newPlan as any)[field]}
+                    onChange={(e) => setNewPlan(p => ({ ...p, [field]: type === "number" ? Number(e.target.value) : e.target.value.replace(/[^a-z0-9_-]/g, field === "id" ? "" : e.target.value) }))}
+                    className="w-full px-2 py-1.5 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
+                </div>
+              ))}
+              <div>
+                <label className="text-[10px] text-gray-500 mb-0.5 block">颜色标签</label>
+                <select value={newPlan.color} onChange={(e) => setNewPlan(p => ({ ...p, color: e.target.value }))}
+                  className="w-full px-2 py-1.5 rounded border border-gray-200 text-xs outline-none">
+                  {PLAN_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button onClick={add} disabled={!newPlan.id || !newPlan.label} className="px-4 py-2 rounded-lg bg-blue-500 text-white text-xs hover:bg-blue-600 disabled:bg-gray-300">添加</button>
+              <button onClick={() => setShowAdd(false)} className="px-4 py-2 rounded-lg border border-gray-200 text-xs hover:bg-gray-50">取消</button>
+            </div>
+          </div>
+        )}
+
+        {/* 套餐表格 */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs text-gray-500 border-b border-gray-200">
+                <th className="pb-2 pr-3 font-medium">套餐ID</th>
+                <th className="pb-2 pr-3 font-medium">名称</th>
+                <th className="pb-2 pr-3 font-medium">价格</th>
+                <th className="pb-2 pr-3 font-medium">对话</th>
+                <th className="pb-2 pr-3 font-medium">生图</th>
+                <th className="pb-2 pr-3 font-medium">天数</th>
+                <th className="pb-2 pr-3 font-medium">每日上限</th>
+                <th className="pb-2 pr-3 font-medium">优先级</th>
+                <th className="pb-2 pr-3 font-medium">颜色</th>
+                <th className="pb-2 font-medium">操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {plans.map((p, idx) => (
+                <tr key={p.id} className="border-b border-gray-50">
+                  <td className="py-2 pr-3 text-xs text-gray-400 font-mono">{p.id}</td>
+                  <td className="py-2 pr-3">
+                    <input value={p.label} onChange={(e) => update(idx, "label", e.target.value)}
+                      className="w-36 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
+                  </td>
+                  <td className="py-2 pr-3">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs text-gray-400">¥</span>
+                      <input type="number" step="0.1" value={p.price ?? ""} onChange={(e) => update(idx, "price", Number(e.target.value))}
+                        className="w-16 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
+                    </div>
+                  </td>
+                  {(["chatQuota", "imageQuota", "durationDays", "dailyLimit", "rank"] as const).map(f => (
+                    <td key={f} className="py-2 pr-3">
+                      <input type="number" value={p[f] as number} onChange={(e) => update(idx, f, Number(e.target.value))}
+                        className="w-16 px-2 py-1 rounded border border-gray-200 text-xs outline-none focus:border-blue-400" />
+                    </td>
+                  ))}
+                  <td className="py-2 pr-3">
+                    <select value={p.color || "blue"} onChange={(e) => update(idx, "color", e.target.value)}
+                      className="px-2 py-1 rounded border border-gray-200 text-xs outline-none">
+                      {PLAN_COLORS.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </td>
+                  <td className="py-2">
+                    <button onClick={() => remove(idx)} disabled={plans.length <= 1}
+                      className="text-xs text-red-400 hover:text-red-600 disabled:text-gray-300">删除</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex items-center gap-3 pt-2">
+          <button onClick={save} disabled={saving}
+            className="px-5 py-2 rounded-xl bg-blue-500 text-white text-sm hover:bg-blue-600 disabled:bg-gray-300">
+            {saving ? "保存中..." : saved ? "已保存 ✓" : "保存套餐配置"}
+          </button>
+          <p className="text-xs text-gray-400">保存后前端充值弹窗立即生效</p>
+        </div>
       </div>
     </div>
   );
