@@ -72,6 +72,18 @@ export function KnowledgePanel({
     } catch {}
   };
 
+  const handleClearAll = async () => {
+    if (!confirm(`确定要清空全部 ${items.length} 条知识库内容吗？此操作不可恢复。`)) return;
+    await Promise.all(items.map(item =>
+      fetch("/api/knowledge", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, itemId: item.id }),
+      }).catch(() => {})
+    ));
+    setItems([]);
+  };
+
   const handleAdd = async () => {
     if (!newTitle.trim() || !newContent.trim()) return;
     setSaving(true);
@@ -126,6 +138,15 @@ export function KnowledgePanel({
             </span>
           </div>
           <div className="flex items-center gap-2">
+            {items.length > 0 && (
+              <button
+                onClick={handleClearAll}
+                className="px-2 py-1 rounded-lg text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-[10px] transition-colors"
+                title="清空全部"
+              >
+                清空全部
+              </button>
+            )}
             <button
               onClick={() => setShowAddForm(!showAddForm)}
               className="px-2 py-1 rounded-lg text-[var(--muted)] hover:bg-[var(--sidebar-hover)] text-[10px] transition-colors"

@@ -286,6 +286,7 @@ export function Sidebar() {
           setSidebarKeyMsg({ ok: true, text: data.message });
           setSidebarKeyInput("");
           setUserApiKey("");
+          setTimeout(fetchQuota, 500);
         } else {
           setSidebarKeyMsg({ ok: false, text: data.error || "兑换失败" });
         }

@@ -98,8 +98,20 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
       setLocalProfession(userProfession || "");
       setLocalAvatar(userAvatar || "people");
       setSaved(false);
-      // 加载视频设置
       if (userId) {
+        // 从后端同步 profile（兴趣/职业跨设备持久化）
+        fetch(`/api/profile?userId=${encodeURIComponent(userId)}`)
+          .then((r) => r.json())
+          .then((data) => {
+            if (data.profile?.interests?.length > 0) {
+              setLocalInterests(data.profile.interests);
+            }
+            if (data.profile?.profession) {
+              setLocalProfession(data.profile.profession);
+            }
+          })
+          .catch(() => {});
+        // 加载视频设置
         fetch(`/api/video-settings?userId=${userId}`)
           .then((r) => r.json())
           .then((data) => { if (data.settings) setVideoSettings(data.settings); })

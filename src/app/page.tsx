@@ -857,27 +857,34 @@ function ChatApp() {
         <div className="shrink-0 pb-2 sm:pb-4 pt-2 overflow-visible safe-bottom relative">
           <ChatInput onSend={handleSend} disabled={isGenerating} onStop={handleStop} />
           {!isPaidUser && (
-            <div className="absolute right-2 sm:right-4 bottom-4 sm:bottom-6 z-10 group">
+            <div className="absolute right-2 sm:right-4 bottom-4 sm:bottom-6 z-10">
+              {shareCopied && (
+                <div className="absolute bottom-full right-0 mb-2 px-3 py-2 bg-green-500 text-white rounded-xl shadow-lg text-xs whitespace-nowrap animate-fade-in">
+                  复制成功！快去分享吧 🎉
+                </div>
+              )}
+              {!shareCopied && (
+                <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-[10px] whitespace-nowrap opacity-0 hover:opacity-100 pointer-events-none">
+                  邀请好友，双方各得额度
+                </div>
+              )}
               {shareCode ? (
                 <button
                   onClick={handleCopyShareLink}
-                  className="flex items-center justify-center w-9 h-9 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-md"
+                  className="flex items-center justify-center w-12 h-12 rounded-full bg-orange-500 text-white hover:bg-orange-600 active:scale-95 transition-all shadow-lg"
                   title="邀请好友得额度"
                 >
-                  {shareCopied ? <Check size={14} /> : <Gift size={14} />}
+                  {shareCopied ? <Check size={20} /> : <Gift size={20} />}
                 </button>
               ) : (
                 <button
                   onClick={handleGenerateShareCode}
-                  className="flex items-center justify-center w-9 h-9 rounded-full bg-orange-500 text-white hover:bg-orange-600 transition-colors shadow-md"
+                  className="flex items-center justify-center w-12 h-12 rounded-full bg-orange-500 text-white hover:bg-orange-600 active:scale-95 transition-all shadow-lg"
                   title="邀请好友得额度"
                 >
-                  <Gift size={14} />
+                  <Gift size={20} />
                 </button>
               )}
-              <div className="absolute bottom-full right-0 mb-2 px-2.5 py-1.5 bg-[var(--card)] border border-[var(--border)] rounded-lg shadow-lg text-[10px] whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                邀请好友，双方各得额度
-              </div>
             </div>
           )}
         </div>
