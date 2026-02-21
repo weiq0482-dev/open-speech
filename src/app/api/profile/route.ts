@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
 // POST: 保存用户兴趣和资料，用 AI 生成专家提示词
 export async function POST(req: NextRequest) {
   try {
-    const { userId, interests, customInterests, profession, researchDirection, userName, avatar } = await req.json();
+    const { userId, interests, customInterests, profession, researchDirection, userName, avatar, fromSettings } = await req.json();
 
     if (!userId || !isValidUserId(userId)) {
       return NextResponse.json({ error: "无效的用户标识" }, { status: 400 });
@@ -110,8 +110,8 @@ export async function POST(req: NextRequest) {
     // 先用预设模板生成基础专家
     let recommendedExperts = generateExpertsForInterests(allInterests, profession, researchDirection);
 
-    // 如果用户填写了自定义关键词或职业，调用 AI 生成定制专家
-    if (hasCustom || hasProfession) {
+    // 仅首次设置时调用 AI 生成定制专家（fromSettings=true 时跳过，避免每次保存设置都等 AI）
+    if (!fromSettings && (hasCustom || hasProfession)) {
       try {
         const aiExperts = await generateExpertsWithAI(
           allInterests,
@@ -120,7 +120,6 @@ export async function POST(req: NextRequest) {
           researchDirection?.trim()
         );
         if (aiExperts.length > 0) {
-          // AI 生成的专家替换预设专家（去重）
           const existingNames = new Set(recommendedExperts.map(e => e.name));
           for (const expert of aiExperts) {
             if (!existingNames.has(expert.name)) {
@@ -128,12 +127,10 @@ export async function POST(req: NextRequest) {
               existingNames.add(expert.name);
             }
           }
-          // 限制总数
           recommendedExperts = recommendedExperts.slice(0, 6);
         }
       } catch (e) {
         console.warn("[AI expert generation fallback]", e);
-        // AI 失败时使用预设专家，不影响流程
       }
     }
 
@@ -572,7 +569,8 @@ async function seedKnowledgeBase(
   // 限制最多预设 10 条
   const toSeed = items.slice(0, 10);
 
-  for (const item of toSeed) {
+  // 并行写入，避免串行 N 次 Redis 调用
+  await Promise.all(toSeed.map(async (item) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const kbItem = {
       id,
@@ -585,5 +583,5 @@ async function seedKnowledgeBase(
     };
     await redis.set(`${KB_PREFIX}${userId}:${id}`, kbItem);
     await redis.lpush(indexKey, id);
-  }
+  }));
 }

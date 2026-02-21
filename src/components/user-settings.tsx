@@ -163,6 +163,7 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
             interests: localInterests,
             profession: localProfession.trim(),
             avatar: localAvatar,
+            fromSettings: true,
           }),
         }),
         fetch("/api/video-settings", {

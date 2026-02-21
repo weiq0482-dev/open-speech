@@ -132,12 +132,9 @@ export function NotebookList({
     }
 
     seedingRef.current = true;
-    (async () => {
-      for (const tpl of toCreate) {
-        await createNotebook(userId, tpl.title, tpl.icon);
-      }
-      localStorage.setItem(key, "1");
-    })();
+    Promise.all(toCreate.map((tpl) => createNotebook(userId, tpl.title, tpl.icon)))
+      .then(() => localStorage.setItem(key, "1"))
+      .catch(() => {});
   }, [loadingList, templates, notebooks, userId, createNotebook]);
 
   const handleCreate = async () => {
