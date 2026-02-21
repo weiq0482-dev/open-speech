@@ -52,7 +52,7 @@ interface AdminSession {
   adminKey: string; // 用于 API 鉴权
 }
 
-type TabKey = "messages" | "users" | "coupons" | "settings" | "trash" | "admins" | "monitor";
+type TabKey = "messages" | "users" | "coupons" | "orders" | "settings" | "trash" | "admins" | "monitor";
 
 // ========== 工具函数 ==========
 function adminFetch(url: string, session: AdminSession, options?: RequestInit) {
@@ -252,6 +252,7 @@ export default function AdminPage() {
     { key: "messages", label: "客服消息", perm: "messages", icon: <MessageSquare size={16} /> },
     { key: "users", label: "用户管理", perm: "users", icon: <Users size={16} /> },
     { key: "coupons", label: "兑换码", perm: "coupons", icon: <Gift size={16} /> },
+    { key: "orders", label: "订单管理", perm: "coupons", icon: <UserPlus size={16} /> },
     { key: "settings", label: "系统设置", perm: "settings", icon: <Settings size={16} /> },
     { key: "trash", label: "回收站", perm: "trash", icon: <Trash2 size={16} /> },
     { key: "admins", label: "管理员", perm: "admins", icon: <Shield size={16} /> },
@@ -299,6 +300,7 @@ export default function AdminPage() {
         {activeTab === "settings" && <SettingsTab session={session} />}
         {activeTab === "trash" && <TrashTab session={session} />}
         {activeTab === "admins" && <AdminsTab session={session} />}
+        {activeTab === "orders" && <OrdersTab session={session} />}
         {activeTab === "monitor" && <MonitorTab session={session} />}
       </div>
     </div>
@@ -1529,6 +1531,150 @@ function MonitorTab({ session }: { session: AdminSession }) {
           <p className="text-center text-gray-400 text-sm py-8">暂无访问记录</p>
         )}
       </div>
+    </div>
+  );
+}
+
+// ========== 订单管理 Tab ==========
+interface OrderRecord {
+  orderId: string;
+  userId: string;
+  plan: string;
+  amount: number;
+  payType: string;
+  status: "pending" | "paid" | "failed";
+  couponCode?: string;
+  createdAt: string;
+  paidAt?: string;
+}
+
+function OrdersTab({ session }: { session: AdminSession }) {
+  const [orders, setOrders] = useState<OrderRecord[]>([]);
+  const [stats, setStats] = useState({ total: 0, paid: 0, pending: 0, totalAmount: 0 });
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const pageSize = 20;
+
+  const fetchOrders = useCallback(async () => {
+    setLoading(true);
+    try {
+      const resp = await adminFetch(`/api/admin/orders?status=${statusFilter}&page=${page}`, session);
+      if (resp.ok) {
+        const data = await resp.json();
+        setOrders(data.orders || []);
+        setTotal(data.total || 0);
+        if (data.stats) setStats(data.stats);
+      }
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [session, statusFilter, page]);
+
+  useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+  const statusLabel: Record<string, { text: string; cls: string }> = {
+    paid:    { text: "已支付", cls: "bg-green-100 text-green-700" },
+    pending: { text: "待支付", cls: "bg-yellow-100 text-yellow-700" },
+    failed:  { text: "已失败", cls: "bg-red-100 text-red-700" },
+  };
+  const payTypeLabel: Record<string, string> = { wxpay: "微信", alipay: "支付宝" };
+
+  return (
+    <div className="space-y-4">
+      {/* 统计卡片 */}
+      <div className="grid grid-cols-4 gap-4">
+        {[
+          { label: "总订单", value: stats.total, color: "text-gray-700" },
+          { label: "已支付", value: stats.paid, color: "text-green-600" },
+          { label: "待支付", value: stats.pending, color: "text-yellow-600" },
+          { label: "总收入", value: `¥${stats.totalAmount.toFixed(2)}`, color: "text-blue-600" },
+        ].map((s) => (
+          <div key={s.label} className="bg-white rounded-xl border border-gray-200 p-4">
+            <p className="text-xs text-gray-500">{s.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* 筛选 + 刷新 */}
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          {[
+            { v: "all", label: "全部" },
+            { v: "paid", label: "已支付" },
+            { v: "pending", label: "待支付" },
+          ].map((f) => (
+            <button
+              key={f.v}
+              onClick={() => { setStatusFilter(f.v); setPage(1); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                statusFilter === f.v
+                  ? "bg-blue-500 text-white border-blue-500"
+                  : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={fetchOrders} className="px-3 py-1.5 rounded-lg text-xs bg-white border border-gray-200 hover:bg-gray-50">
+          刷新
+        </button>
+      </div>
+
+      {/* 订单表格 */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-gray-50 text-gray-500 text-xs">
+              <th className="text-left px-4 py-3 font-medium">订单号</th>
+              <th className="text-left px-4 py-3 font-medium">用户ID</th>
+              <th className="text-left px-4 py-3 font-medium">套餐</th>
+              <th className="text-left px-4 py-3 font-medium">金额</th>
+              <th className="text-left px-4 py-3 font-medium">支付方式</th>
+              <th className="text-left px-4 py-3 font-medium">状态</th>
+              <th className="text-left px-4 py-3 font-medium">激活码</th>
+              <th className="text-left px-4 py-3 font-medium">下单时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={8} className="text-center text-gray-400 py-12">加载中...</td></tr>
+            ) : orders.length === 0 ? (
+              <tr><td colSpan={8} className="text-center text-gray-400 py-12">暂无订单</td></tr>
+            ) : orders.map((o) => {
+              const st = statusLabel[o.status] || { text: o.status, cls: "bg-gray-100 text-gray-600" };
+              return (
+                <tr key={o.orderId} className="border-t border-gray-100 hover:bg-gray-50">
+                  <td className="px-4 py-3 font-mono text-xs text-gray-500">{o.orderId}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500 max-w-[120px] truncate" title={o.userId}>{o.userId.slice(0, 12)}...</td>
+                  <td className="px-4 py-3 text-xs font-medium">{o.plan}</td>
+                  <td className="px-4 py-3 text-sm font-bold text-green-600">¥{Number(o.amount).toFixed(2)}</td>
+                  <td className="px-4 py-3 text-xs">{payTypeLabel[o.payType] || o.payType}</td>
+                  <td className="px-4 py-3">
+                    <span className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${st.cls}`}>{st.text}</span>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-blue-600">{o.couponCode || "-"}</td>
+                  <td className="px-4 py-3 text-xs text-gray-500">{new Date(o.createdAt).toLocaleString("zh-CN")}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 分页 */}
+      {total > pageSize && (
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>共 {total} 条</span>
+          <div className="flex gap-2">
+            <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">上一页</button>
+            <span className="px-3 py-1">第 {page} 页</span>
+            <button disabled={page * pageSize >= total} onClick={() => setPage(p => p + 1)} className="px-3 py-1 rounded border border-gray-200 disabled:opacity-40 hover:bg-gray-50">下一页</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
