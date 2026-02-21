@@ -262,11 +262,11 @@ export default function AdminPage() {
   const tabs = allTabs.filter((t) => session.permissions.includes(t.perm));
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-blue-500 px-6 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-6">
-          <h1 className="text-lg font-bold text-white">OpenSpeech 管理后台</h1>
-          <nav className="flex gap-1">
+    <div className="h-screen flex flex-col bg-gray-50">
+      <header className="bg-blue-500 px-4 py-2 flex items-center justify-between flex-shrink-0 min-w-0">
+        <div className="flex items-center gap-4 min-w-0 flex-1">
+          <h1 className="text-base font-bold text-white whitespace-nowrap">OpenSpeech 管理后台</h1>
+          <nav className="flex gap-1 overflow-x-auto scrollbar-none flex-1">
             {tabs.map((tab) => (
               <button
                 key={tab.key}
@@ -294,7 +294,7 @@ export default function AdminPage() {
         </div>
       </header>
 
-      <div className="p-6">
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 md:p-6">
         {activeTab === "messages" && <MessagesTab session={session} />}
         {activeTab === "users" && <UsersTab session={session} />}
         {activeTab === "coupons" && <CouponsTab session={session} />}
@@ -353,7 +353,7 @@ function MessagesTab({ session }: { session: AdminSession }) {
   const activeThread = threads.find((t) => t.userId === activeUserId);
 
   return (
-    <div className="flex bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden" style={{ height: "calc(100vh - 140px)" }}>
+    <div className="flex bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full">
       {/* 左侧列表 */}
       <div className="w-72 border-r border-gray-200 flex flex-col">
         <div className="p-3 border-b border-gray-100 text-xs text-gray-500">
@@ -957,7 +957,7 @@ function SettingsTab({ session }: { session: AdminSession }) {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-4 max-w-5xl">
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
       <div className="space-y-4">
       {/* 模型提供商配置 */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
