@@ -699,7 +699,7 @@ async function fetchBilibiliInfo(id: { bvid?: string; aid?: string }): Promise<{
   return { title: "B站视频", description: "", author: "", transcript: "" };
 }
 
-// 通用网页解析（抖音、小红书等）
+// 通用网页解析（小红书等）
 async function fetchPageInfo(url: string, platform: string): Promise<{ title: string; description: string; author: string }> {
   try {
     const resp = await fetch(url, {
@@ -735,6 +735,91 @@ async function fetchPageInfo(url: string, platform: string): Promise<{ title: st
     return { title, description, author };
   } catch {}
   return { title: `${platform}视频`, description: "", author: "" };
+}
+
+// 抖音专用解析（尝试从页面提取更多内容）
+async function fetchDouyinInfo(url: string): Promise<{ title: string; description: string; author: string; transcript: string }> {
+  const UAs = [
+    // 移动端 UA - 抖音对移动端限制较少
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+    // 微信内置浏览器
+    "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/116.0.0.0 Mobile Safari/537.36 MicroMessenger/8.0.50",
+  ];
+
+  let html = "";
+  for (const ua of UAs) {
+    try {
+      const resp = await fetch(url, {
+        headers: {
+          "User-Agent": ua,
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "zh-CN,zh;q=0.9",
+          Referer: "https://www.douyin.com/",
+        },
+        signal: AbortSignal.timeout(12000),
+        redirect: "follow",
+      });
+      if (resp.ok) {
+        html = await resp.text();
+        if (html.length > 500) break;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  if (!html) return { title: "抖音视频", description: "", author: "", transcript: "" };
+
+  // 辅助：清理 HTML 实体
+  const clean = (s: string) =>
+    s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\\n/g, "\n").trim();
+
+  // 优先从 og/twitter meta 提取
+  const getMeta = (prop: string) => {
+    const m = html.match(new RegExp(`<meta[^>]*(?:property|name)=["']${prop}["'][^>]*content=["']([^"']{1,500})["']`, "i"))
+           || html.match(new RegExp(`<meta[^>]*content=["']([^"']{1,500})["'][^>]*(?:property|name)=["']${prop}["']`, "i"));
+    return m ? clean(m[1]) : "";
+  };
+
+  let title = getMeta("og:title") || getMeta("twitter:title");
+  if (!title) {
+    const t = html.match(/<title[^>]*>([\s\S]{1,200}?)<\/title>/i);
+    title = t ? clean(t[1]) : "抖音视频";
+  }
+  // 去掉「抖音-...」前缀
+  title = title.replace(/^抖音[-–—·|]?\s*/i, "").replace(/\s*[-–—·|]?\s*抖音$/i, "") || "抖音视频";
+
+  const ogDesc = getMeta("og:description") || getMeta("twitter:description") || getMeta("description");
+  const author = getMeta("og:site_name") || getMeta("twitter:site") || getMeta("author") || "";
+
+  // 尝试从页面内嵌 JSON 数据提取视频文案/描述（抖音会把数据放在 __NEXT_DATA__ 或 window.__INITIAL_STATE__）
+  let jsonDesc = "";
+  try {
+    const nextDataMatch = html.match(/<script id="__NEXT_DATA__"[^>]*>([\s\S]+?)<\/script>/i);
+    if (nextDataMatch) {
+      const nd = JSON.parse(nextDataMatch[1]);
+      // 递归搜索 desc 字段
+      const findDesc = (obj: unknown, depth = 0): string => {
+        if (depth > 8 || !obj || typeof obj !== "object") return "";
+        for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+          if ((k === "desc" || k === "title" || k === "shareDesc") && typeof v === "string" && v.length > 5) return v;
+          const r = findDesc(v, depth + 1);
+          if (r) return r;
+        }
+        return "";
+      };
+      jsonDesc = findDesc(nd);
+    }
+  } catch { /* 忽略解析失败 */ }
+
+  // 合并描述文本作为 transcript（抖音无字幕，用描述文本作为内容依据）
+  const parts: string[] = [];
+  if (jsonDesc) parts.push(jsonDesc);
+  if (ogDesc && ogDesc !== jsonDesc) parts.push(ogDesc);
+  const transcript = parts.join("\n\n");
+
+  return { title: title || "抖音视频", description: ogDesc, author, transcript };
 }
 
 // 构建视频来源内容（包含字幕全文，供 notebook AI 分析）
@@ -807,6 +892,8 @@ export async function POST(req: NextRequest) {
         break;
       }
       case "douyin":
+        videoInfo = await fetchDouyinInfo(url);
+        break;
       case "xiaohongshu":
       default:
         videoInfo = await fetchPageInfo(url, platformNames[platform]);

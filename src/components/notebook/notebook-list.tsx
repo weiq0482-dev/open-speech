@@ -117,11 +117,12 @@ export function NotebookList({
       .catch(() => {});
   }, [userId]);
 
-  // 自动创建模板知识库（首次打开时）
+  // 自动创建模板知识库（首次打开时，或知识库为空时）
   useEffect(() => {
     if (loadingList || seedingRef.current || templates.length === 0) return;
     const key = `nb_seeded_${userId}`;
-    if (localStorage.getItem(key)) return;
+    // 知识库为空时无论如何都要重试；已有知识库时才信任 localStorage 标记
+    if (notebooks.length > 0 && localStorage.getItem(key)) return;
 
     const existingTitles = new Set(notebooks.map((nb) => nb.title));
     const toCreate = templates.filter((t) => !existingTitles.has(t.title));
