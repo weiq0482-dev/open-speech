@@ -855,6 +855,33 @@ function SettingsTab({ session }: { session: AdminSession }) {
   const [epayKey, setEpayKey] = useState("");
   const [epayNotifyUrl, setEpayNotifyUrl] = useState("");
   const [epayReturnUrl, setEpayReturnUrl] = useState("");
+  // 工作台广告配置
+  const [adCardEnabled, setAdCardEnabled] = useState(true);
+  const [douyinQrUrl, setDouyinQrUrl] = useState("/douyin-qr.png");
+  const [douyinAccount, setDouyinAccount] = useState("arch8288");
+  const [douyinDesc, setDouyinDesc] = useState("免费体验卡 · 教程 · 功能更新");
+  const [wechatQrUrl, setWechatQrUrl] = useState("/wechat-qr.png");
+  const [wechatGroupName, setWechatGroupName] = useState("Open-speech 超级梦想家");
+  const [wechatDesc, setWechatDesc] = useState("微信扫码 · 把想法变成现实");
+  const [contactWechatId, setContactWechatId] = useState("jryg8686");
+  // 广告位配置
+  const [adBannerEnabled, setAdBannerEnabled] = useState(true);
+  const [adBannerTitle, setAdBannerTitle] = useState("广告位招租");
+  const [adBannerContent, setAdBannerContent] = useState("");
+  const [adBannerImageUrl, setAdBannerImageUrl] = useState("");
+  const [adBannerLinkUrl, setAdBannerLinkUrl] = useState("");
+  const [adBannerButtonText, setAdBannerButtonText] = useState("了解详情");
+  // 新用户注册赠送
+  const [newUserGiftTotal, setNewUserGiftTotal] = useState(35);
+  const [newUserTrialDays, setNewUserTrialDays] = useState(7);
+  const [newUserDailyGiftLimit, setNewUserDailyGiftLimit] = useState(5);
+  // 签到赠送
+  const [checkinEnabled, setCheckinEnabled] = useState(false);
+  const [checkinMaxDays, setCheckinMaxDays] = useState(7);
+  const [checkinDailyGift, setCheckinDailyGift] = useState(3);
+  // 推荐奖励
+  const [referralBonus, setReferralBonus] = useState(66);
+  const [referralMaxBonus, setReferralMaxBonus] = useState(5500);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
@@ -866,6 +893,14 @@ function SettingsTab({ session }: { session: AdminSession }) {
         setModelProvider(d.settings.modelProvider || "qwen");
         setQwenApiKey(d.settings.qwenApiKey || "");
         setGeminiApiKey(d.settings.geminiApiKey || "");
+        setNewUserGiftTotal(d.settings.newUserGiftTotal ?? 35);
+        setNewUserTrialDays(d.settings.newUserTrialDays ?? 7);
+        setNewUserDailyGiftLimit(d.settings.newUserDailyGiftLimit ?? 5);
+        setCheckinEnabled(d.settings.checkinEnabled ?? false);
+        setCheckinMaxDays(d.settings.checkinMaxDays ?? 7);
+        setCheckinDailyGift(d.settings.checkinDailyGift ?? 3);
+        setReferralBonus(d.settings.referralBonus ?? 66);
+        setReferralMaxBonus(d.settings.referralMaxBonus ?? 5500);
       }
     }).catch(() => {});
     adminFetch("/api/admin/site-config", session).then((r) => r.json()).then((d) => {
@@ -876,6 +911,20 @@ function SettingsTab({ session }: { session: AdminSession }) {
         setEpayKey(d.config.epayKey || "");
         setEpayNotifyUrl(d.config.epayNotifyUrl || "");
         setEpayReturnUrl(d.config.epayReturnUrl || "");
+        setAdCardEnabled(d.config.adCardEnabled ?? true);
+        setDouyinQrUrl(d.config.douyinQrUrl || "/douyin-qr.png");
+        setDouyinAccount(d.config.douyinAccount || "arch8288");
+        setDouyinDesc(d.config.douyinDesc || "免费体验卡 · 教程 · 功能更新");
+        setWechatQrUrl(d.config.wechatQrUrl || "/wechat-qr.png");
+        setWechatGroupName(d.config.wechatGroupName || "Open-speech 超级梦想家");
+        setWechatDesc(d.config.wechatDesc || "微信扫码 · 把想法变成现实");
+        setContactWechatId(d.config.contactWechatId || "");
+        setAdBannerEnabled(d.config.adBannerEnabled ?? true);
+        setAdBannerTitle(d.config.adBannerTitle || "广告位招租");
+        setAdBannerContent(d.config.adBannerContent || "");
+        setAdBannerImageUrl(d.config.adBannerImageUrl || "");
+        setAdBannerLinkUrl(d.config.adBannerLinkUrl || "");
+        setAdBannerButtonText(d.config.adBannerButtonText || "了解详情");
       }
     }).catch(() => {});
   }, [session]);
@@ -885,11 +934,21 @@ function SettingsTab({ session }: { session: AdminSession }) {
     try {
       await adminFetch("/api/admin/settings", session, {
         method: "POST",
-        body: JSON.stringify({ freeTrialDays, freeDailyLimit, modelProvider, qwenApiKey, geminiApiKey }),
+        body: JSON.stringify({
+          freeTrialDays, freeDailyLimit, modelProvider, qwenApiKey, geminiApiKey,
+          newUserGiftTotal, newUserTrialDays, newUserDailyGiftLimit,
+          checkinEnabled, checkinMaxDays, checkinDailyGift,
+          referralBonus, referralMaxBonus,
+        }),
       });
       await adminFetch("/api/admin/site-config", session, {
         method: "POST",
-        body: JSON.stringify({ videoRetentionDays, epayApiUrl, epayPid, epayKey, epayNotifyUrl, epayReturnUrl }),
+        body: JSON.stringify({
+          videoRetentionDays, epayApiUrl, epayPid, epayKey, epayNotifyUrl, epayReturnUrl,
+          adCardEnabled, douyinQrUrl, douyinAccount, douyinDesc,
+          wechatQrUrl, wechatGroupName, wechatDesc, contactWechatId,
+          adBannerEnabled, adBannerTitle, adBannerContent, adBannerImageUrl, adBannerLinkUrl, adBannerButtonText,
+        }),
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
@@ -965,6 +1024,67 @@ function SettingsTab({ session }: { session: AdminSession }) {
         )}
       </div>
 
+      {/* 工作台广告配置 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">🖼️ 工作台广告配置</h3>
+          <select value={adCardEnabled ? "on" : "off"} onChange={e => setAdCardEnabled(e.target.value === "on")}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none">
+            <option value="on">开启</option><option value="off">关闭</option>
+          </select>
+        </div>
+        <p className="text-xs text-gray-400">首页展示的抖音/微信二维码卡片</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2 border border-gray-100 rounded-xl p-3">
+            <p className="text-xs font-medium text-gray-600">左侧广告（抖音）</p>
+            <input placeholder="标题" value={douyinAccount} onChange={e => setDouyinAccount(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+            <input placeholder="副标题" value={douyinDesc} onChange={e => setDouyinDesc(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+            <input placeholder="图片URL（/douyin-qr.png）" value={douyinQrUrl} onChange={e => setDouyinQrUrl(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+          </div>
+          <div className="space-y-2 border border-gray-100 rounded-xl p-3">
+            <p className="text-xs font-medium text-gray-600">右侧广告（微信）</p>
+            <input placeholder="标题" value={wechatGroupName} onChange={e => setWechatGroupName(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+            <input placeholder="副标题" value={wechatDesc} onChange={e => setWechatDesc(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+            <input placeholder="图片URL（/wechat-qr.png）" value={wechatQrUrl} onChange={e => setWechatQrUrl(e.target.value)}
+              className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+          </div>
+        </div>
+        <div>
+          <label className="text-xs text-gray-500 mb-1 block">客服微信ID</label>
+          <input placeholder="微信号" value={contactWechatId} onChange={e => setContactWechatId(e.target.value)}
+            className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-xs outline-none focus:border-blue-500" />
+        </div>
+      </div>
+
+      {/* 广告位配置 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">📢 广告位配置</h3>
+          <select value={adBannerEnabled ? "on" : "off"} onChange={e => setAdBannerEnabled(e.target.value === "on")}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none">
+            <option value="on">开启</option><option value="off">关闭</option>
+          </select>
+        </div>
+        <p className="text-xs text-gray-400">首页底部广告横幅，仅对免费用户显示</p>
+        <input placeholder="广告标题" value={adBannerTitle} onChange={e => setAdBannerTitle(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+        <textarea placeholder="广告内容描述文字" value={adBannerContent} onChange={e => setAdBannerContent(e.target.value)} rows={2}
+          className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500 resize-none" />
+        <input placeholder="广告图片URL（建议 750×200px）" value={adBannerImageUrl} onChange={e => setAdBannerImageUrl(e.target.value)}
+          className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+        <div className="grid grid-cols-2 gap-2">
+          <input placeholder="链接地址 https://..." value={adBannerLinkUrl} onChange={e => setAdBannerLinkUrl(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          <input placeholder="按钮文字（了解详情）" value={adBannerButtonText} onChange={e => setAdBannerButtonText(e.target.value)}
+            className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+        </div>
+      </div>
+
       </div>{/* 左栏结束 */}
 
       <div className="space-y-4">
@@ -980,6 +1100,73 @@ function SettingsTab({ session }: { session: AdminSession }) {
           <div>
             <label className="text-xs text-gray-500 mb-1 block">每日免费额度（次）</label>
             <input type="number" value={freeDailyLimit} onChange={(e) => setFreeDailyLimit(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          </div>
+        </div>
+      </div>
+
+      {/* 新用户注册赠送 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <h3 className="text-sm font-semibold">🎁 新用户注册赠送</h3>
+        <p className="text-xs text-gray-400">注册后赠送体验额度，有效期内每天有上限。体验期结束后赠送额度自动失效。</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">注册赠送总张数</label>
+            <input type="number" min={0} value={newUserGiftTotal} onChange={e => setNewUserGiftTotal(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">新用户体验期（天）</label>
+            <input type="number" min={1} value={newUserTrialDays} onChange={e => setNewUserTrialDays(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          </div>
+          <div className="col-span-2">
+            <label className="text-xs text-gray-500 mb-1 block">赠送额度每日上限（张）</label>
+            <input type="number" min={1} value={newUserDailyGiftLimit} onChange={e => setNewUserDailyGiftLimit(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+            <p className="text-xs text-gray-400 mt-1">建议 = 体验期天数 × 每日上限</p>
+          </div>
+        </div>
+      </div>
+
+      {/* 连续登录签到赠送 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold">📅 连续登录签到赠送</h3>
+          <select value={checkinEnabled ? "on" : "off"} onChange={e => setCheckinEnabled(e.target.value === "on")}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none">
+            <option value="on">开启</option><option value="off">关闭</option>
+          </select>
+        </div>
+        <p className="text-xs text-gray-400">用户每天登录自动签到，连续签到可获得当日图额度。当天额度当天有效，未用完次日清零。</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">连续签到天数上限</label>
+            <input type="number" min={1} value={checkinMaxDays} onChange={e => setCheckinMaxDays(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+            <p className="text-xs text-gray-400 mt-1">超过后不再发放</p>
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">每日签到赠送张数</label>
+            <input type="number" min={1} value={checkinDailyGift} onChange={e => setCheckinDailyGift(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          </div>
+        </div>
+      </div>
+
+      {/* 推荐奖励配置 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+        <h3 className="text-sm font-semibold">👥 推荐奖励配置</h3>
+        <p className="text-xs text-gray-400">成功推荐新用户注册后，双方均获得奖励额度。</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">推荐奖励张数（每成功推荐1人）</label>
+            <input type="number" min={0} value={referralBonus} onChange={e => setReferralBonus(Number(e.target.value))}
+              className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
+          </div>
+          <div>
+            <label className="text-xs text-gray-500 mb-1 block">推荐奖励累计上限（张）</label>
+            <input type="number" min={0} value={referralMaxBonus} onChange={e => setReferralMaxBonus(Number(e.target.value))}
               className="w-full px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:border-blue-500" />
           </div>
         </div>

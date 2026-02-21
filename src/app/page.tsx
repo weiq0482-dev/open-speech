@@ -219,6 +219,9 @@ function ChatApp() {
     douyinQrUrl: string; douyinAccount: string; douyinDesc: string;
     wechatQrUrl: string; wechatGroupName: string; wechatDesc: string;
     contactWechatId: string; contactQrUrl: string;
+    adCardEnabled?: boolean;
+    adBannerEnabled?: boolean; adBannerTitle?: string; adBannerContent?: string;
+    adBannerImageUrl?: string; adBannerLinkUrl?: string; adBannerButtonText?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -812,8 +815,8 @@ function ChatApp() {
                   </div>
                 )}
 
-                {/* 二维码并排区域 */}
-                <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4">
+                {/* 二维码并排区域（后台可控制显示/隐藏） */}
+                {siteConfig?.adCardEnabled !== false && <div className="max-w-2xl mx-auto grid grid-cols-2 gap-4">
                   {/* 抖音 */}
                   <div className="bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] flex flex-col items-center text-center gap-3">
                     <img src={siteConfig?.douyinQrUrl || "/douyin-qr.png"} alt="抖音" className="w-32 h-32 rounded-xl" />
@@ -830,7 +833,7 @@ function ChatApp() {
                       <p className="text-[11px] text-[var(--muted)] mt-1">{siteConfig?.wechatDesc || "微信扫码 · 把想法变成现实"}</p>
                     </div>
                   </div>
-                </div>
+                </div>}
 
                 {/* 群介绍 */}
                 <div className="max-w-2xl mx-auto bg-[var(--card)] rounded-2xl p-4 border border-[var(--border)] text-xs text-[var(--muted)] leading-relaxed space-y-1.5">
@@ -840,8 +843,8 @@ function ChatApp() {
                   <p className="font-medium text-[var(--foreground)]">不画饼、不空谈。你的超级梦想，从这里开始上线。</p>
                 </div>
 
-                {/* 广告位（可关闭） */}
-                {showAdBanner && (
+                {/* 广告位（可关闭，后台可配置） */}
+                {showAdBanner && siteConfig?.adBannerEnabled !== false && (
                   <div className="max-w-2xl mx-auto bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-2xl p-4 border border-blue-200 dark:border-blue-800 relative">
                     <button
                       onClick={() => handleDismissAd(false)}
@@ -850,9 +853,19 @@ function ChatApp() {
                     >
                       <X size={14} />
                     </button>
+                    {siteConfig?.adBannerImageUrl && (
+                      <img src={siteConfig.adBannerImageUrl} alt="广告" className="w-full rounded-xl mb-3 object-cover max-h-32" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    )}
                     <div className="text-center">
-                      <p className="text-sm font-medium text-blue-700 dark:text-blue-300">📢 广告位</p>
-                      <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">此处可展示推广内容，后台可配置</p>
+                      <p className="text-sm font-medium text-blue-700 dark:text-blue-300">📢 {siteConfig?.adBannerTitle || "广告位"}</p>
+                      {siteConfig?.adBannerContent && <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">{siteConfig.adBannerContent}</p>}
+                      {!siteConfig?.adBannerContent && <p className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">此处可展示推广内容，后台可配置</p>}
+                      {siteConfig?.adBannerLinkUrl && (
+                        <a href={siteConfig.adBannerLinkUrl} target="_blank" rel="noopener noreferrer"
+                          className="mt-2 inline-block px-3 py-1 bg-blue-500 text-white rounded-lg text-xs hover:bg-blue-600 transition-colors">
+                          {siteConfig.adBannerButtonText || "了解详情"}
+                        </a>
+                      )}
                     </div>
                     <button
                       onClick={() => {

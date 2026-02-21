@@ -185,14 +185,11 @@ async function migrateQuota(fromUserId: string, toUserId: string): Promise<void>
   const fromKey = `quota:${fromUserId}`;
   const toKey = `quota:${toUserId}`;
 
-  // 目标账户已有配额就不覆盖
-  const existingTo = await redis.get(toKey);
-  if (existingTo) return;
-
-  const fromQuota = await redis.get(fromKey);
-  if (fromQuota) {
-    await redis.set(toKey, fromQuota);
-  }
+  const [fromQuota, existingTo] = await Promise.all([redis.get<Record<string, unknown>>(fromKey), redis.get<Record<string, unknown>>(toKey)]);
+  if (!fromQuota) return;
+  // 目标已有付费配额就不覆盖；目标为 free 或空时迁移
+  if (existingTo && (existingTo.plan as string) !== "free") return;
+  await redis.set(toKey, fromQuota);
 }
 
 // ========== 绑定设备到邮箱账户 ==========

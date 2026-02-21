@@ -14,6 +14,7 @@ interface UserInfo {
   locked: string | null;
   createdAt?: string;
   lastLogin?: string;
+  deviceIds?: string[];
 }
 
 // 从 quota 记录构建用户信息（quota 可能不存在）
@@ -21,7 +22,7 @@ function buildUserInfo(
   userId: string,
   quota: Record<string, unknown> | null,
   locked: string | null,
-  extra?: { email?: string; createdAt?: string; lastLogin?: string }
+  extra?: { email?: string; createdAt?: string; lastLogin?: string; deviceIds?: string[] }
 ): UserInfo {
   return {
     userId,
@@ -36,6 +37,7 @@ function buildUserInfo(
     locked: locked || null,
     createdAt: extra?.createdAt,
     lastLogin: extra?.lastLogin,
+    deviceIds: extra?.deviceIds,
   };
 }
 
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
       accountKeys.map(k => redis.get<Record<string, unknown>>(k).catch(() => null))
     );
 
-    const emailAccountMap = new Map<string, { email: string; userId: string; createdAt?: string; lastLogin?: string }>();
+    const emailAccountMap = new Map<string, { email: string; userId: string; createdAt?: string; lastLogin?: string; deviceIds?: string[] }>();
     const userIds: string[] = [];
     accountDataList.forEach((account, idx) => {
       if (account?.userId) {
@@ -63,6 +65,7 @@ export async function GET(req: NextRequest) {
             userId: uid,
             createdAt: account.createdAt as string | undefined,
             lastLogin: account.lastLogin as string | undefined,
+            deviceIds: (account.deviceIds as string[] | undefined) || [],
           });
         }
       }
@@ -74,8 +77,27 @@ export async function GET(req: NextRequest) {
       Promise.all(userIds.map(uid => redis.get<string>(`locked:${uid}`).catch(() => null))),
     ]);
 
+    // 对 quota 为 free 的邮箱账户，检查关联设备是否有付费 quota
+    const enrichedQuotas = await Promise.all(
+      userIds.map(async (uid, idx) => {
+        let quota = quotaResults[idx];
+        if (!quota || (quota.plan as string) === "free") {
+          const acctInfo = emailAccountMap.get(uid);
+          const deviceIds = acctInfo?.deviceIds || [];
+          for (const dId of deviceIds) {
+            const dQuota = await redis.get<Record<string, unknown>>(`${QUOTA_PREFIX}${dId}`).catch(() => null);
+            if (dQuota && (dQuota.plan as string) !== "free") {
+              quota = dQuota;
+              break;
+            }
+          }
+        }
+        return quota;
+      })
+    );
+
     const users = userIds.map((uid, idx) =>
-      buildUserInfo(uid, quotaResults[idx], lockedResults[idx], emailAccountMap.get(uid))
+      buildUserInfo(uid, enrichedQuotas[idx], lockedResults[idx], emailAccountMap.get(uid))
     );
 
     users.sort((a, b) => {
