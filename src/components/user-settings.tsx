@@ -69,6 +69,7 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
   const [localAvatar, setLocalAvatar] = useState(userAvatar || "people");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [tab, setTab] = useState<"profile" | "interests" | "video">("profile");
 
   // 视频/数字人设置（多角色 + 平台账号）
@@ -133,6 +134,7 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
 
   const handleSave = async () => {
     setSaving(true);
+    setSaveError("");
     try {
       setUserProfile({
         userName: localName.trim(),
@@ -141,29 +143,44 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
         userAvatar: localAvatar,
       });
 
-      // 同步到后端
-      await fetch("/api/profile", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          userName: localName.trim(),
-          interests: localInterests,
-          profession: localProfession.trim(),
-          avatar: localAvatar,
-        }),
-      });
+      // 清理 blob URL（仅浏览器内有效，不能持久化）
+      const cleanedVideoSettings = {
+        ...videoSettings,
+        digitalHumans: videoSettings.digitalHumans.map((h) => ({
+          ...h,
+          avatarPhotoUrl: h.avatarPhotoUrl?.startsWith("blob:") ? "" : (h.avatarPhotoUrl || ""),
+        })),
+      };
 
-      // 保存视频设置
-      await fetch("/api/video-settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, ...videoSettings }),
-      });
+      // 两个接口并行保存，提升速度
+      const [r1, r2] = await Promise.all([
+        fetch("/api/profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId,
+            userName: localName.trim(),
+            interests: localInterests,
+            profession: localProfession.trim(),
+            avatar: localAvatar,
+          }),
+        }),
+        fetch("/api/video-settings", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId, ...cleanedVideoSettings }),
+        }),
+      ]);
+
+      if (!r1.ok || !r2.ok) {
+        throw new Error("保存失败，请重试");
+      }
 
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-    } catch {}
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "保存失败，请检查网络");
+    }
     setSaving(false);
   };
 
@@ -489,11 +506,14 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
         </div>
 
         {/* Footer */}
-          <div className="px-5 py-4 border-t border-[var(--border)] shrink-0">
+          <div className="px-5 py-4 border-t border-[var(--border)] shrink-0 space-y-2">
+            {saveError && (
+              <p className="text-xs text-red-500 text-center">{saveError}</p>
+            )}
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
+              className={`w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white text-sm font-medium transition-colors disabled:bg-blue-300 ${saved ? "bg-green-500 hover:bg-green-600" : "bg-blue-500 hover:bg-blue-600"}`}
             >
               {saving ? (
                 <>
@@ -503,7 +523,7 @@ export function UserSettings({ open, onClose }: { open: boolean; onClose: () => 
               ) : saved ? (
                 <>
                   <Check size={16} />
-                  已保存
+                  已保存 ✓
                 </>
               ) : (
                 "保存设置"
